@@ -1,0 +1,19 @@
+- metrics instrumentation
+- repository & data model
+- scalaformat
+- rest of metals keybindings
+- nvim colors
+- sbt what is := 
+- prometheus setup (docker image or similar + scraping enabled)
+- docker image
+- kube deployment
+
+
+///
+
+16.2.
+- logging
+
+17.2
+- metrics
+
