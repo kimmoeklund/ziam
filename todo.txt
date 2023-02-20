@@ -1,6 +1,5 @@
-- metrics instrumentation
-- repository & data model
 - scalaformat
+- repository & data model
 - rest of metals keybindings
 - nvim colors
 - sbt what is := 
