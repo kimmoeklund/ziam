@@ -15,5 +15,6 @@ libraryDependencies ++= Seq(
   "org.postgresql" % "postgresql" % "42.2.8",
   "dev.zio" %% "zio-logging" % zioLoggingVersion,
   "dev.zio" %% "zio-logging-slf4j" % zioLoggingVersion,
-  "ch.qos.logback" % "logback-classic" % logbackClassicVersion
+  "ch.qos.logback" % "logback-classic" % logbackClassicVersion,
+  "com.outr" %% "scalapass" % "1.2.5"
 )
