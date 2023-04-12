@@ -1,5 +1,4 @@
 package fi.kimmoeklund.domain
-
 import java.util.UUID
 import zio.json.*
 

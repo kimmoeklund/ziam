@@ -41,3 +41,12 @@ ServiceUserService
 - remove group
 - effective permissions
 
+
+////
+
+- learn Zio error handling: Task vs IO
+- repo vs service layer
+	- Service myzio esimerkin mukaan
+	- Repo quick startin mukaan
+
+

@@ -1,4 +1,10 @@
+- tests and docker
+
 - repository & data model
+	- write basic service 
+	- write repo interface and IT tests
+	- container init
+
 - rest of metals keybindings
 - nvim colors
 - sbt what is := 
@@ -18,3 +24,10 @@
 20.2
 - scalaformat
 
+4.4.
+
+- repository jne samplen mukaiseksi.. mikä oli vika?
+
+11.4.
+
+testcontainer logs miten pois, ruyak mik' juttu, miksi zio logit ei nay?
