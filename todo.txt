@@ -31,3 +31,12 @@
 11.4.
 
 testcontainer logs miten pois, ruyak mik' juttu, miksi zio logit ei nay?
+
+12.4
+
+- first DB test passing 
+- refactor query to have permissions - left joins to permission grants and permissions itsel
+
+14.4
+
+- add roles, permission 

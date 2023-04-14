@@ -91,7 +91,8 @@ final class UserRepositoryLive(
   override def effectivePermissionsForUser(
       id: String
   ): Task[Option[Seq[Permission]]] = ???
-  override def add(
+
+  override def addUser(
       user: User,
       pwdCredentials: fi.kimmoeklund.domain.PasswordCredentials,
       organization: Organization
@@ -107,6 +108,38 @@ final class UserRepositoryLive(
       }
     return ret
   }
+  override def addRole(role: Role): Task[Unit] =
+    val ret = transaction {
+      for {
+        _ <-
+          run(query[Roles].insertValue(lift(new Roles(role.id, role.name))))
+        _ <-
+          run {
+            liftQuery(role.permissions).foreach(p =>
+              query[PermissionGrants].insertValue(
+                new PermissionGrants(lift(role.id), p.id)
+              )
+            )
+          }
+      } yield ()
+    }
+    return ret
+
+  override def addPermission(permission: Permission) =
+    for {
+      _ <- run(
+        query[Permissions].insertValue(
+          lift(
+            new Permissions(
+              permission.id,
+              permission.target,
+              permission.permission
+            )
+          )
+        )
+      )
+    } yield ()
+
   override def updateUserGroups(): Task[Option[User]] = ???
 
 object UserRepositoryLive:

@@ -6,7 +6,11 @@ import fi.kimmoeklund.domain._
 trait UserRepository:
   def checkUserPassword(userName: String, password: String): Task[Option[User]]
 
-  def add(user: User, pwdCredentials: PasswordCredentials, organization: Organization): Task[Unit]
+  def addUser(user: User, pwdCredentials: PasswordCredentials, organization: Organization): Task[Unit]
+
+  def addRole(role: Role): Task[Unit]
+
+  def addPermission(permission: Permission): Task[Unit]
   
   def updateUserRoles(): Task[Option[User]]
   
@@ -18,8 +22,14 @@ object UserRepository:
   def checkUserPassword(userName: String, password: String): ZIO[UserRepository, Throwable, Option[User]] =
     ZIO.serviceWithZIO[UserRepository](_.checkUserPassword(userName, password))
 
-  def add(user: User, pwdCredentials: PasswordCredentials, organization: Organization): ZIO[UserRepository, Throwable, Unit] = 
-    ZIO.serviceWithZIO[UserRepository](_.add(user, pwdCredentials, organization))
+  def addUser(user: User, pwdCredentials: PasswordCredentials, organization: Organization): ZIO[UserRepository, Throwable, Unit] = 
+    ZIO.serviceWithZIO[UserRepository](_.addUser(user, pwdCredentials, organization))
+
+  def addRole(role: Role): ZIO[UserRepository, Throwable, Unit] =
+    ZIO.serviceWithZIO[UserRepository](_.addRole(role))
+
+  def addPermission(permission: Permission): ZIO[UserRepository, Throwable, Unit] =
+    ZIO.serviceWithZIO[UserRepository](_.addPermission(permission))
 
   def updateUserRoles(): ZIO[UserRepository, Throwable, Option[User]] =
     ZIO.serviceWithZIO[UserRepository](_.updateUserRoles())

@@ -21,15 +21,33 @@ object UserRepositorySpec extends ZIOSpecDefault:
   val postgresLayer = Quill.Postgres.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
   val repoLayer = UserRepositoryLive.layer
 
-  val user = User(UUID.randomUUID(), "test user", Seq.empty)
+  val permission1 = Permission(UUID.randomUUID(), "test1", 1)
+  val permission2 = Permission(UUID.randomUUID(), "test2", 1)
+  val role1 = Role(UUID.randomUUID(), "testrole1", Seq(permission1))
+  val role2 = Role(UUID.randomUUID(), "testrole2", Seq(permission2))
   val org = Organization(UUID.randomUUID(), "test org")
+  val user = User(UUID.randomUUID(), "test user", Seq(role1, role2))
   val creds = PasswordCredentials(user._1, "test@email.invalid", "password")
+
+  // TODO generators, and looping items and asserts
 
   override def spec =
     suite("user repository test with postgres test container")(
+      test("it should add permission to the database") {
+        for {
+          permission1 <- UserRepository.addPermission(permission1)
+          permission2 <- UserRepository.addPermission(permission2)
+        } yield assert(permission2)(isUnit)
+      },
+      test("it should add roles to the database") {
+        for {
+          role1 <- UserRepository.addRole(role1)
+          role2 <- UserRepository.addRole(role2)
+        } yield assert(role2)(isUnit)
+      },
       test("it should add user to the database") {
         for {
-          success <- UserRepository.add(user, creds, org)
+          success <- UserRepository.addUser(user, creds, org)
         } yield assert(success)(isUnit)
       },
       test("it should check user's password") {
