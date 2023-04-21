@@ -13,51 +13,78 @@ import fi.kimmoeklund.service.UserRepository
 import io.getquill.SnakeCase
 import io.getquill.Escape
 import io.getquill.NamingStrategy
+import scala.collection.mutable.ListBuffer
 
 object UserRepositorySpec extends ZIOSpecDefault:
 
   val containerLayer = ZLayer.scoped(PostgresContainer.make())
   val dataSourceLayer = ZLayer(ZIO.service[DataSourceBuilder].map(_.dataSource))
-  val postgresLayer = Quill.Postgres.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
+  val postgresLayer =
+    Quill.Postgres.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
   val repoLayer = UserRepositoryLive.layer
+  val unicodeString = Gen.stringBounded(5, 100)(Gen.unicodeChar)
+  val asciiString = Gen.stringBounded(3, 12)(Gen.alphaNumericChar)
 
-  val permission1 = Permission(UUID.randomUUID(), "test1", 1)
-  val permission2 = Permission(UUID.randomUUID(), "test2", 1)
-  val role1 = Role(UUID.randomUUID(), "testrole1", Seq(permission1))
-  val role2 = Role(UUID.randomUUID(), "testrole2", Seq(permission2))
-  val org = Organization(UUID.randomUUID(), "test org")
-  val user = User(UUID.randomUUID(), "test user", Seq(role1, role2))
-  val creds = PasswordCredentials(user._1, "test@email.invalid", "password")
+  val permissions = ListBuffer[Permission]()
+  val roles = ListBuffer[Role]()
+  val credentials = ListBuffer[PasswordCredentials]()
+  val users = ListBuffer[User]()
+  
+  def makeUserFetchTest(creds: PasswordCredentials) = 
+        test("it should check all users from the database") {
+          for {
+            _ <- Console.printLine(s"fetching user for userName ${creds.userName}")
+            user <- UserRepository.checkUserPassword(
+              creds.userName,
+              creds.password
+            )
+          } yield assert(user)(equalTo(users.find(u => u.id == creds.userId)))
+        }
 
-  // TODO generators, and looping items and asserts
+  def secondSuite(creds: ListBuffer[PasswordCredentials]) = suite("test suite")(creds.toList.map(makeUserFetchTest): _*)
 
   override def spec =
     suite("user repository test with postgres test container")(
       test("it should add permission to the database") {
-        for {
-          permission1 <- UserRepository.addPermission(permission1)
-          permission2 <- UserRepository.addPermission(permission2)
-        } yield assert(permission2)(isUnit)
-      },
+        check(asciiString, Gen.int) { (name, number) =>
+          val permission =
+            Permission(UUID.randomUUID(), s"permission-$name", number)
+          permissions += permission
+          for {
+            result <- UserRepository.addPermission(permission)
+            _ <- Console.printLine("added permission")
+          } yield assert(result)(isUnit)
+        }
+      } @@ samples(3),
       test("it should add roles to the database") {
-        for {
-          role1 <- UserRepository.addRole(role1)
-          role2 <- UserRepository.addRole(role2)
-        } yield assert(role2)(isUnit)
-      },
+        check(asciiString) { name =>
+          val newRole =
+            Role(UUID.randomUUID(), s"role-$name", permissions.toSeq)
+          roles += newRole
+          for {
+            role <- UserRepository.addRole(newRole)
+            _ <- Console.printLine(
+              s"added role with ${newRole.permissions.size} permissions"
+            )
+          } yield assert(role)(isUnit)
+        }
+      } @@ samples(3),
       test("it should add user to the database") {
-        for {
-          success <- UserRepository.addUser(user, creds, org)
-        } yield assert(success)(isUnit)
-      },
-      test("it should check user's password") {
-        for {
-          ret <- UserRepository.checkUserPassword(
-            creds.userName,
-            creds.password
-          )
-        } yield assert(ret)(equalTo(Some(user)))
-      }
+        check(unicodeString, asciiString) { (randomName, userName) =>
+          val userId = UUID.randomUUID()
+          val newCreds = PasswordCredentials(userId, userName, userName)
+          credentials += newCreds
+          for {
+            success <- UserRepository.addUser(
+              User(userId, randomName, roles.toSeq),
+              newCreds,
+              Organization(UUID.randomUUID(), "test org")
+            )
+            _ <- Console.printLine(s"added user with ${roles.size} roles")
+          } yield assert(success)(isUnit)
+        }
+      } @@ samples(100),
+      secondSuite(credentials)      
     ).provideShared(
       containerLayer,
       DataSourceBuilderLive.layer,

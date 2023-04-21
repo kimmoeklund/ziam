@@ -33,6 +33,7 @@ object Conv:
       creds: fi.kimmoeklund.domain.PasswordCredentials
   ) =
     new PasswordCredentials(user._1, creds._2, creds._3)
+  def toRoles(role: Role) = Roles(role.id, role.name)
 
 final class UserRepositoryLive(
     quill: Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]]
@@ -104,6 +105,11 @@ final class UserRepositoryLive(
         for {
           _ <- run(query[Members].insertValue(lift(members)))
           _ <- run(query[PasswordCredentials].insertValue(lift(creds)))
+          _ <- run {
+            liftQuery(user.roles.map(Conv.toRoles)).foreach(r =>
+              query[RoleGrants].insertValue(RoleGrants(r.id, lift(user.id)))
+            )
+          }
         } yield ()
       }
     return ret
@@ -139,8 +145,6 @@ final class UserRepositoryLive(
         )
       )
     } yield ()
-
-  override def updateUserGroups(): Task[Option[User]] = ???
 
 object UserRepositoryLive:
   def layer: URLayer[Quill.Postgres[

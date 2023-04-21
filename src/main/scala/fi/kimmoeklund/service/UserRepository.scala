@@ -14,8 +14,6 @@ trait UserRepository:
   
   def updateUserRoles(): Task[Option[User]]
   
-  def updateUserGroups(): Task[Option[User]]
-  
   def effectivePermissionsForUser(id: String): Task[Option[Seq[Permission]]]
 
 object UserRepository:
@@ -33,9 +31,6 @@ object UserRepository:
 
   def updateUserRoles(): ZIO[UserRepository, Throwable, Option[User]] =
     ZIO.serviceWithZIO[UserRepository](_.updateUserRoles())
-
-  def updateUserGroups(): ZIO[UserRepository, Throwable, Option[User]] =
-    ZIO.serviceWithZIO[UserRepository](_.updateUserGroups())
 
   def effectivePermissionsForUser(id: String): ZIO[UserRepository, Throwable, Option[Seq[Permission]]] = 
     ZIO.serviceWithZIO[UserRepository](_.effectivePermissionsForUser(id))

@@ -11,7 +11,8 @@
 - prometheus setup (docker image or similar + scraping enabled)
 - docker image
 - kube deployment
-
+- htmx UI: what do I need
+	- 
 
 ///
 
@@ -40,3 +41,11 @@ testcontainer logs miten pois, ruyak mik' juttu, miksi zio logit ei nay?
 14.4
 
 - add roles, permission 
+
+week 17.4 - 21.4
+- tests and generators
+- why is fetching not working?
+	- toList is evaluated on empty list before effects run
+- why second run is creating more than 900 users? and why PK violation
+
+

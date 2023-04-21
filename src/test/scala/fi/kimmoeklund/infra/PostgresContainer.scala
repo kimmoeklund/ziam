@@ -17,10 +17,10 @@ object PostgresContainer:
             a.withDatabaseName("ziam")
             a.withPassword("ziam")
             a.withInitScript("ziam_schema.sql")
-           // a.withReuse(true)
+            a.withReuse(true)
             ()
           }      
         c.start()
         c
       }
-  } { container => ZIO.succeed(()) } //ZIO.attempt(container.stop()).orDie }
+  } { container => ZIO.succeed(()) } 
