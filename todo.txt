@@ -46,6 +46,8 @@ week 17.4 - 21.4
 - tests and generators
 - why is fetching not working?
 	- toList is evaluated on empty list before effects run
+	- how this should be modelleed: Environment or Layers? Or some other way?
+
 - why second run is creating more than 900 users? and why PK violation
 
 

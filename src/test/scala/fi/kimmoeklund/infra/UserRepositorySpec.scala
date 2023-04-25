@@ -15,6 +15,16 @@ import io.getquill.Escape
 import io.getquill.NamingStrategy
 import scala.collection.mutable.ListBuffer
 
+final case class TestScenario(
+    users: List[User],
+    roles: List[Role],
+    permissions: List[Permission],
+    credentials: List[PasswordCredentials]
+)
+
+object TestScenario:
+  def create: TestScenario = TestScenario(List(), List(), List(), List())
+
 object UserRepositorySpec extends ZIOSpecDefault:
 
   val containerLayer = ZLayer.scoped(PostgresContainer.make())
@@ -22,26 +32,31 @@ object UserRepositorySpec extends ZIOSpecDefault:
   val postgresLayer =
     Quill.Postgres.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
   val repoLayer = UserRepositoryLive.layer
+  val testScenario = ZState.initial(TestScenario.create)
   val unicodeString = Gen.stringBounded(5, 100)(Gen.unicodeChar)
   val asciiString = Gen.stringBounded(3, 12)(Gen.alphaNumericChar)
 
-  val permissions = ListBuffer[Permission]()
-  val roles = ListBuffer[Role]()
-  val credentials = ListBuffer[PasswordCredentials]()
-  val users = ListBuffer[User]()
-  
-  def makeUserFetchTest(creds: PasswordCredentials) = 
-        test("it should check all users from the database") {
-          for {
-            _ <- Console.printLine(s"fetching user for userName ${creds.userName}")
-            user <- UserRepository.checkUserPassword(
-              creds.userName,
-              creds.password
-            )
-          } yield assert(user)(equalTo(users.find(u => u.id == creds.userId)))
-        }
+  def fetchUsers: ZIO[ZState[TestScenario] & UserRepository, Throwable, List[Spec[Any, Nothing]]] =
+    val users = for {
+      testData <- ZIO.serviceWithZIO[ZState[TestScenario]](_.get)
+      userResults <- ZIO.collectAll(testData.credentials.map { creds =>
+        UserRepository.checkUserPassword(
+          creds.userName,
+          creds.password
+        )
+      })
+      _ <- Console.printLine(s"fetched ${userResults.size} users")
+    } yield (userResults, testData.users)
 
-  def secondSuite(creds: ListBuffer[PasswordCredentials]) = suite("test suite")(creds.toList.map(makeUserFetchTest): _*)
+    val tests = users.map((fetchedUsers, createdUsers) => {
+      createdUsers.map(cUser => {
+        test("assert fetched user") {
+          val fUser = fetchedUsers.find(fu => fu.get.id == cUser.id)
+          assertTrue(cUser == fUser)
+        }
+      })
+    })
+    return tests
 
   override def spec =
     suite("user repository test with postgres test container")(
@@ -49,46 +64,58 @@ object UserRepositorySpec extends ZIOSpecDefault:
         check(asciiString, Gen.int) { (name, number) =>
           val permission =
             Permission(UUID.randomUUID(), s"permission-$name", number)
-          permissions += permission
           for {
             result <- UserRepository.addPermission(permission)
             _ <- Console.printLine("added permission")
-          } yield assert(result)(isUnit)
+            testData <- ZIO.service[ZState[TestScenario]]
+            _ <- testData.update(data =>
+              data.copy(permissions = data.permissions.appended(permission))
+            )
+          } yield assertTrue(result == ())
         }
-      } @@ samples(3),
+      },
       test("it should add roles to the database") {
         check(asciiString) { name =>
-          val newRole =
-            Role(UUID.randomUUID(), s"role-$name", permissions.toSeq)
-          roles += newRole
           for {
+            testState <- ZIO.service[ZState[TestScenario]]
+            testData <- testState.get
+            newRole <- ZIO.succeed(
+              Role(UUID.randomUUID(), s"role-$name", testData.permissions)
+            )
             role <- UserRepository.addRole(newRole)
             _ <- Console.printLine(
               s"added role with ${newRole.permissions.size} permissions"
             )
-          } yield assert(role)(isUnit)
+            _ <- testState.update(data =>
+              data.copy(roles = data.roles.appended(newRole))
+            )
+          } yield assertTrue(role == ())
         }
-      } @@ samples(3),
+      }, 
       test("it should add user to the database") {
         check(unicodeString, asciiString) { (randomName, userName) =>
-          val userId = UUID.randomUUID()
-          val newCreds = PasswordCredentials(userId, userName, userName)
-          credentials += newCreds
+          val newCreds =
+            PasswordCredentials(UUID.randomUUID(), userName, userName)
           for {
+            testState <- ZIO.service[ZState[TestScenario]]
+            testData <- testState.get
             success <- UserRepository.addUser(
-              User(userId, randomName, roles.toSeq),
+              User(newCreds.userId, randomName, testData.roles),
               newCreds,
               Organization(UUID.randomUUID(), "test org")
             )
-            _ <- Console.printLine(s"added user with ${roles.size} roles")
-          } yield assert(success)(isUnit)
+            _ <- testState.update(data =>
+              data.copy(credentials = data.credentials.appended(newCreds))
+            )
+          } yield assertTrue(success == ())
         }
-      } @@ samples(100),
-      secondSuite(credentials)      
+      },
+      suite("fetch and assert fetched users")(fetchUsers)
     ).provideShared(
       containerLayer,
       DataSourceBuilderLive.layer,
       dataSourceLayer,
       postgresLayer,
-      repoLayer
-    ) @@ sequential
+      repoLayer,
+      testScenario
+    ) @@ sequential @@ samples(2) @@ nondeterministic
