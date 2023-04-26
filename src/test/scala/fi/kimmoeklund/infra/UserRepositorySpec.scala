@@ -45,7 +45,6 @@ object UserRepositorySpec extends ZIOSpecDefault:
           creds.password
         )
       })
-      _ <- Console.printLine(s"fetched ${userResults.size} users")
     } yield (userResults, testData.users)
 
     val tests = users.map((fetchedUsers, createdUsers) => {
@@ -66,7 +65,6 @@ object UserRepositorySpec extends ZIOSpecDefault:
             Permission(UUID.randomUUID(), s"permission-$name", number)
           for {
             result <- UserRepository.addPermission(permission)
-            _ <- Console.printLine("added permission")
             testData <- ZIO.service[ZState[TestScenario]]
             _ <- testData.update(data =>
               data.copy(permissions = data.permissions.appended(permission))
@@ -83,9 +81,6 @@ object UserRepositorySpec extends ZIOSpecDefault:
               Role(UUID.randomUUID(), s"role-$name", testData.permissions)
             )
             role <- UserRepository.addRole(newRole)
-            _ <- Console.printLine(
-              s"added role with ${newRole.permissions.size} permissions"
-            )
             _ <- testState.update(data =>
               data.copy(roles = data.roles.appended(newRole))
             )
@@ -111,11 +106,10 @@ object UserRepositorySpec extends ZIOSpecDefault:
         }
       },
       suite("fetch and assert fetched users")(fetchUsers)
-    ).provideShared(
-      containerLayer,
+    ).provideShared(containerLayer,
       DataSourceBuilderLive.layer,
       dataSourceLayer,
       postgresLayer,
       repoLayer,
       testScenario
-    ) @@ sequential @@ samples(2) @@ nondeterministic
+    ) @@ sequential @@ samples(10) @@ nondeterministic

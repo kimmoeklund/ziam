@@ -10,6 +10,7 @@
 - sbt what is := 
 - prometheus setup (docker image or similar + scraping enabled)
 - docker image
+- tests: size vs. samples
 - kube deployment
 - htmx UI: what do I need
 	- 
