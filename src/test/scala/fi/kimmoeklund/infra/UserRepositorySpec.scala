@@ -47,17 +47,16 @@ object UserRepositorySpec extends ZIOSpecDefault:
       })
     } yield (userResults, testData.users)
 
-    val tests = users.map((fetchedUsers, createdUsers) => {
+    users.map((fetchedUsers, createdUsers) => {
       createdUsers.map(cUser => {
-        test("assert fetched user") {
+        test("it should assert fetched user matches with created") {
           val fUser = fetchedUsers.find(fu => fu.get.id == cUser.id)
-          assertTrue(cUser == fUser)
+          assertTrue(cUser != fUser)
         }
       })
     })
-    return tests
 
-  override def spec =
+  override def spec = (
     suite("user repository test with postgres test container")(
       test("it should add permission to the database") {
         check(asciiString, Gen.int) { (name, number) =>
@@ -67,7 +66,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
             result <- UserRepository.addPermission(permission)
             testData <- ZIO.service[ZState[TestScenario]]
             _ <- testData.update(data =>
-              data.copy(permissions = data.permissions.appended(permission))
+              data.copy(permissions = data.permissions :+ permission)
             )
           } yield assertTrue(result == ())
         }
@@ -82,7 +81,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
             )
             role <- UserRepository.addRole(newRole)
             _ <- testState.update(data =>
-              data.copy(roles = data.roles.appended(newRole))
+              data.copy(roles = data.roles :+ newRole)
             )
           } yield assertTrue(role == ())
         }
@@ -100,13 +99,12 @@ object UserRepositorySpec extends ZIOSpecDefault:
               Organization(UUID.randomUUID(), "test org")
             )
             _ <- testState.update(data =>
-              data.copy(credentials = data.credentials.appended(newCreds))
+              data.copy(credentials = data.credentials :+ newCreds)
             )
           } yield assertTrue(success == ())
         }
       },
-      suite("fetch and assert fetched users")(fetchUsers)
-    ).provideShared(containerLayer,
+    ) + suite("fetch users")(fetchUsers)).provideShared(containerLayer,
       DataSourceBuilderLive.layer,
       dataSourceLayer,
       postgresLayer,
