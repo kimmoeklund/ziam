@@ -12,3 +12,8 @@ case class Organization(id: UUID, name: String) extends Member
 object Member:
   given JsonEncoder[Member] = DeriveJsonEncoder.gen[Member]
   given JsonDecoder[Member] = DeriveJsonDecoder.gen[Member]
+
+object User:
+  given JsonEncoder[User] = DeriveJsonEncoder.gen[User]
+  given JsonDecoder[User] = DeriveJsonDecoder.gen[User]
+

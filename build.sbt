@@ -11,7 +11,7 @@ name := "ziam"
 libraryDependencies ++= Seq(
   "dev.zio" %% "zio" % zioVersion,
   "dev.zio" %% "zio-json" % "0.3.0-RC11",
-  "dev.zio" %% "zio-http" % "0.0.4",
+  "dev.zio" %% "zio-http" % "3.0.0-RC1",
   "dev.zio" %% "zio-logging" % zioLoggingVersion,
   "io.getquill" %% "quill-zio" % quillVersion,
   "io.getquill" %% "quill-jdbc-zio" % quillVersion,

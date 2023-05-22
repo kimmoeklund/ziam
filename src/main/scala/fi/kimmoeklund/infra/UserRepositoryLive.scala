@@ -41,6 +41,19 @@ final class UserRepositoryLive(
 
   import quill.*
 
+  private def userJoinQuote = quote { (m: Members) =>
+    for {
+      rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
+      r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
+      pg <- query[PermissionGrants].leftJoin(pg =>
+        r.forall(role => role.id == pg.roleId)
+      )
+      p <- query[Permissions].leftJoin(p =>
+        pg.forall(grant => p.id == grant.permissionId)
+      )
+    } yield (rg, r, p)
+  }
+
   override def checkUserPassword(
       userName: String,
       password: String
@@ -52,34 +65,20 @@ final class UserRepositoryLive(
             p.userName == lift(userName) && p.password == lift(password)
           )
           m <- query[Members].join(m => m.id == creds.memberId)
-          rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
-          r <- query[Roles].leftJoin(r =>
-            rg.forall(grant => r.id == grant.roleId)
-          )
-          pg <- query[PermissionGrants].leftJoin(pg =>
-            r.forall(role => role.id == pg.roleId)
-          )
-          p <- query[Permissions].leftJoin(p =>
-            pg.forall(grant => p.id == grant.permissionId)
-          )
-        } yield (m, r, pg, p)
+          (pg, r, p) <- userJoinQuote(m)
+        } yield (m, r, p)
       }
     }.fold(
       _ => Option.empty,
       list => {
         val roles = list.flatMap(_._2).distinct
-        val permissionGrants =
-          list.flatMap(_._3).groupMap(_.roleId)(_.permissionId)
-        val permissions = list.flatMap(_._4).distinct
+        val permissions = list.flatMap(_._3).distinct
         val domainRoles = roles
           .map(r =>
             new Role(
               r.id,
               r.name,
               permissions
-                .filter(permission =>
-                  permissionGrants(r.id).contains(permission.id)
-                )
                 .map(p => new Permission(p.id, p.target, p.permission))
             )
           )
@@ -145,6 +144,48 @@ final class UserRepositoryLive(
         )
       )
     } yield ()
+
+  override def getUsers: Task[List[User]] =
+    val users = run {
+      quote {
+        for {
+          m <- query[Members]
+          (rg, r, p) <- userJoinQuote(m)
+        } yield (m, rg, p, r)
+      }
+    }.fold(
+      _ => List(),
+      list =>
+        val members = list.map(_._1).distinct
+        val permissions = list.groupMap(_._4.get)(_._3)
+        val roles = list.groupMap(_._1)(_._4)
+        members.map(m =>
+          User(
+            m.id,
+            m.name,
+            roles(m).flatMap(r =>
+              r match {
+                case Some(r) =>
+                  List(
+                    Role(
+                      r.id,
+                      r.name,
+                      permissions(r).flatMap(p =>
+                        p match {
+                          case Some(p) =>
+                            List(Permission(p.id, p.target, p.permission))
+                          case None => List()
+                        }
+                      )
+                    )
+                  )
+                case None => List()
+              }
+            )
+          )
+        )
+    )
+    return users
 
 object UserRepositoryLive:
   def layer: URLayer[Quill.Postgres[

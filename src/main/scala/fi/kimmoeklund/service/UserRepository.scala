@@ -16,6 +16,8 @@ trait UserRepository:
   
   def effectivePermissionsForUser(id: String): Task[Option[Seq[Permission]]]
 
+  def getUsers: Task[List[User]]
+
 object UserRepository:
   def checkUserPassword(userName: String, password: String): ZIO[UserRepository, Throwable, Option[User]] =
     ZIO.serviceWithZIO[UserRepository](_.checkUserPassword(userName, password))
@@ -34,4 +36,7 @@ object UserRepository:
 
   def effectivePermissionsForUser(id: String): ZIO[UserRepository, Throwable, Option[Seq[Permission]]] = 
     ZIO.serviceWithZIO[UserRepository](_.effectivePermissionsForUser(id))
+
+  def getUsers(): ZIO[UserRepository, Throwable, List[User]] = 
+    ZIO.serviceWithZIO[UserRepository](_.getUsers)
 

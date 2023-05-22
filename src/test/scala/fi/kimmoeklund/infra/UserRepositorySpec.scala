@@ -36,7 +36,9 @@ object UserRepositorySpec extends ZIOSpecDefault:
   val unicodeString = Gen.stringBounded(5, 100)(Gen.unicodeChar)
   val asciiString = Gen.stringBounded(3, 12)(Gen.alphaNumericChar)
 
-  def fetchUsers: ZIO[ZState[TestScenario] & UserRepository, Throwable, List[Spec[Any, Nothing]]] =
+  def fetchUsers: ZIO[ZState[TestScenario] & UserRepository, Throwable, List[
+    Spec[Any, Nothing]
+  ]] =
     val users = for {
       testData <- ZIO.serviceWithZIO[ZState[TestScenario]](_.get)
       userResults <- ZIO.collectAll(testData.credentials.map { creds =>
@@ -45,19 +47,26 @@ object UserRepositorySpec extends ZIOSpecDefault:
           creds.password
         )
       })
-    } yield (userResults, testData.users)
+      _ <- Console.printLine(s"fetched ${userResults.size} users")
 
-    users.map((fetchedUsers, createdUsers) => {
+    } yield (userResults, testData.users, testData.roles)
+
+    users.map((fetchedUsers, createdUsers, createdRoles) => {
       createdUsers.map(cUser => {
-        test("it should assert fetched user matches with created") {
-          val fUser = fetchedUsers.find(fu => fu.get.id == cUser.id)
-          assertTrue(cUser != fUser)
+        test("it should check password for created user") {
+          val fUser = fetchedUsers.find(fu => fu.get.id == cUser.id).get.get
+          assertTrue(cUser._1 == fUser._1)
+          assertTrue(cUser._2 == fUser._2)
+          assertTrue(fUser.roles.forall(fRole => {
+            val cRole = createdRoles.find(cr => cr._1 == fRole._1).get
+            cRole.permissions.sorted == fRole.permissions.sorted
+          }))
         }
       })
     })
 
-  override def spec = (
-    suite("user repository test with postgres test container")(
+  override def spec =
+    (suite("user repository test with postgres test container")(
       test("it should add permission to the database") {
         check(asciiString, Gen.int) { (name, number) =>
           val permission =
@@ -65,9 +74,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
           for {
             result <- UserRepository.addPermission(permission)
             testData <- ZIO.service[ZState[TestScenario]]
-            _ <- testData.update(data =>
-              data.copy(permissions = data.permissions :+ permission)
-            )
+            _ <- testData.update(data => data.copy(permissions = data.permissions :+ permission))
           } yield assertTrue(result == ())
         }
       },
@@ -80,12 +87,10 @@ object UserRepositorySpec extends ZIOSpecDefault:
               Role(UUID.randomUUID(), s"role-$name", testData.permissions)
             )
             role <- UserRepository.addRole(newRole)
-            _ <- testState.update(data =>
-              data.copy(roles = data.roles :+ newRole)
-            )
+            _ <- testState.update(data => data.copy(roles = data.roles :+ newRole))
           } yield assertTrue(role == ())
         }
-      }, 
+      },
       test("it should add user to the database") {
         check(unicodeString, asciiString) { (randomName, userName) =>
           val newCreds =
@@ -93,18 +98,25 @@ object UserRepositorySpec extends ZIOSpecDefault:
           for {
             testState <- ZIO.service[ZState[TestScenario]]
             testData <- testState.get
+            newUser <- ZIO.succeed(
+              User(newCreds.userId, randomName, testData.roles)
+            )
             success <- UserRepository.addUser(
-              User(newCreds.userId, randomName, testData.roles),
+              newUser,
               newCreds,
               Organization(UUID.randomUUID(), "test org")
             )
             _ <- testState.update(data =>
-              data.copy(credentials = data.credentials :+ newCreds)
+              data.copy(
+                credentials = data.credentials :+ newCreds,
+                users = data.users :+ newUser
+              )
             )
           } yield assertTrue(success == ())
         }
-      },
-    ) + suite("fetch users")(fetchUsers)).provideShared(containerLayer,
+      }
+    ) + suite("fetch users")(fetchUsers)).provideShared(
+      containerLayer,
       DataSourceBuilderLive.layer,
       dataSourceLayer,
       postgresLayer,

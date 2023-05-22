@@ -1,0 +1,15 @@
+version: '3.7'
+
+services:
+  postgres:
+    image: postgres:latest
+    restart: always
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+      - ./src/main/resources/ziam-schema.sql:/docker-entrypoint-initdb.d/ziam-schema.sql
+    environment:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_DB: ziam
+    ports:
+      - "5432:5432"

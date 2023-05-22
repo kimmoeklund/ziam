@@ -2,7 +2,6 @@ package fi.kimmoeklund.ziam.hello
 
 import zio._
 import zio.http._
-import zio.http.model.Method
 import zio.metrics._
 
 object HelloApp:
@@ -13,5 +12,5 @@ object HelloApp:
       _ <- ZIO.unit @@ requestCounter
       requests <- requestCounter.value
       _ <- ZIO.logDebug(s"sending hello response ${requests.count}")
-    } yield Response.text("Hello!") 
+    } yield Response.text("cha-cha-cha!") 
   } 
