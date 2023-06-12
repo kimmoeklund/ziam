@@ -1,4 +1,4 @@
-scalaVersion := "3.2.0"
+scalaVersion := "3.3.0"
 val zioLoggingVersion = "2.1.9"
 val logbackClassicVersion = "1.4.4"
 val quillVersion = "4.6.0.1"
