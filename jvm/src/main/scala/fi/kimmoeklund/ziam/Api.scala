@@ -4,12 +4,11 @@ import zio._
 import zio.http._
 import zio.metrics._
 import fi.kimmoeklund.service.UserRepository
-import fi.kimmoeklund.domain._
 import zio.json._
 
 object ZiamApi:
   def apply(): HttpApp[UserRepository, Nothing] = Http.collectZIO[Request] {
-    case Method.GET -> !! / "users" => 
+    case Method.GET -> Root / "users" => 
       val effect = for {
         users <- UserRepository.getUsers()
       } yield users

@@ -1,18 +1,21 @@
 package fi.kimmoeklund.infra
 
+import fi.kimmoeklund.domain
 import io.getquill.PluralizedTableNames
 import io.getquill.jdbczio.Quill
-import zio._
-import zio.test._
-import zio.test.Assertion._
-import zio.test.TestAspect._
+import zio.*
+import zio.test.*
+import zio.test.Assertion.*
+import zio.test.TestAspect.*
 import io.getquill.PluralizedTableNames
-import fi.kimmoeklund.domain._
+import fi.kimmoeklund.domain.*
+
 import java.util.UUID
 import fi.kimmoeklund.service.UserRepository
 import io.getquill.SnakeCase
 import io.getquill.Escape
 import io.getquill.NamingStrategy
+
 import scala.collection.mutable.ListBuffer
 
 final case class TestScenario(
@@ -21,6 +24,8 @@ final case class TestScenario(
     permissions: List[Permission],
     credentials: List[PasswordCredentials]
 )
+
+val testOrg = Organization(UUID.randomUUID(), "test org")
 
 object TestScenario:
   def create: TestScenario = TestScenario(List(), List(), List(), List())
@@ -75,7 +80,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
             result <- UserRepository.addPermission(permission)
             testData <- ZIO.service[ZState[TestScenario]]
             _ <- testData.update(data => data.copy(permissions = data.permissions :+ permission))
-          } yield assertTrue(result == ())
+          } yield assertTrue(result == permission)
         }
       },
       test("it should add roles to the database") {
@@ -94,17 +99,16 @@ object UserRepositorySpec extends ZIOSpecDefault:
       test("it should add user to the database") {
         check(unicodeString, asciiString) { (randomName, userName) =>
           val newCreds =
-            PasswordCredentials(UUID.randomUUID(), userName, userName)
+            domain.PasswordCredentials(UUID.randomUUID(), userName, userName)
           for {
             testState <- ZIO.service[ZState[TestScenario]]
             testData <- testState.get
             newUser <- ZIO.succeed(
-              User(newCreds.userId, randomName, testData.roles)
+              User(newCreds.userId, randomName, testOrg, testData.roles)
             )
             success <- UserRepository.addUser(
               newUser,
-              newCreds,
-              Organization(UUID.randomUUID(), "test org")
+              newCreds
             )
             _ <- testState.update(data =>
               data.copy(

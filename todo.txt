@@ -51,4 +51,24 @@ week 17.4 - 21.4
 - why second run is creating more than 900 users? and why PK violation?
 	- because of the way I am using generators
 
+june
+
+- fixture helper that you can run from sbt easily to populate database for manual testing
+- API integration tests
+
+///
+
+htmx
+
+- second post is breaking the table, why?
+    - its broken already on first submit, just renders ok
+- reset form after submit or return it as part of the response?
+    - tried invoking reset event from the response header
+
+/// generalize basic crud view
+- name of the path
+- form type containing the fields
+- generic validation of the form
+- function to turn form into entity
+
 

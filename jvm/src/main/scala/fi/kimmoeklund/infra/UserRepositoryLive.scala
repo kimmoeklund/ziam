@@ -1,16 +1,17 @@
 package fi.kimmoeklund.infra
 
+import fi.kimmoeklund.domain
+import fi.kimmoeklund.domain.{Organization, Permission, Role, User}
+
 import java.util.UUID
 import fi.kimmoeklund.service.UserRepository
+
 import javax.sql.DataSource
 import zio.*
 import io.getquill.jdbczio.Quill
 import io.getquill.NamingStrategy
 import io.getquill.*
-import fi.kimmoeklund.domain.User
-import fi.kimmoeklund.domain.Role
-import fi.kimmoeklund.domain.Permission
-import fi.kimmoeklund.domain.Organization
+import io.github.arainko.ducktape.*
 
 case class Members(id: UUID, organization: UUID, name: String)
 case class Memberships(memberId: UUID, parent: UUID)
@@ -23,17 +24,14 @@ case class PasswordCredentials(
     userName: String,
     password: String
 )
-// refactor with chimney
 
-object Conv:
-  def toMember(user: User, org: Organization): Members =
-    new Members(user._1, org._1, user._2)
+object Transformers:
+  def toMember(user: User): Members =
+    user.into[Members].transform(Field.computed(_.organization, u => u.organization.id))
   def toPasswordCredentialsTable(
-      user: User,
-      creds: fi.kimmoeklund.domain.PasswordCredentials
-  ) =
-    new PasswordCredentials(user._1, creds._2, creds._3)
-  def toRoles(role: Role) = Roles(role.id, role.name)
+      creds: domain.PasswordCredentials
+  ): PasswordCredentials = creds.into[PasswordCredentials].transform(Field.renamed(_.memberId, _.userId))
+  def toRoles(role: Role): Roles = role.to[Roles]
 
 final class UserRepositoryLive(
     quill: Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]]
@@ -43,36 +41,32 @@ final class UserRepositoryLive(
 
   private def userJoinQuote = quote { (m: Members) =>
     for {
+      o <- query[Organization].join(o => o.id == m.organization)
       rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
       r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
-      pg <- query[PermissionGrants].leftJoin(pg =>
-        r.forall(role => role.id == pg.roleId)
-      )
-      p <- query[Permissions].leftJoin(p =>
-        pg.forall(grant => p.id == grant.permissionId)
-      )
-    } yield (rg, r, p)
+      pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
+      p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
+    } yield (o, rg, r, p)
   }
 
   override def checkUserPassword(
       userName: String,
       password: String
   ): Task[Option[User]] = {
-    return run {
+    run {
       quote {
         for {
-          creds <- query[PasswordCredentials].filter(p =>
-            p.userName == lift(userName) && p.password == lift(password)
-          )
+          creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName) && p.password == lift(password))
           m <- query[Members].join(m => m.id == creds.memberId)
-          (pg, r, p) <- userJoinQuote(m)
-        } yield (m, r, p)
+          (o, pg, r, p) <- userJoinQuote(m)
+        } yield (m, o, r, p)
       }
     }.fold(
       _ => Option.empty,
       list => {
-        val roles = list.flatMap(_._2).distinct
-        val permissions = list.flatMap(_._3).distinct
+        val organization = list.head._2
+        val roles = list.flatMap(_._3).distinct
+        val permissions = list.flatMap(_._4).distinct
         val domainRoles = roles
           .map(r =>
             new Role(
@@ -82,7 +76,7 @@ final class UserRepositoryLive(
                 .map(p => new Permission(p.id, p.target, p.permission))
             )
           )
-        Some(new User(list.head._1.id, list.head._1.name, domainRoles))
+        Some(new User(list.head._1.id, list.head._1.name, Organization(UUID.randomUUID(), "todo"), domainRoles))
       }
     )
   }
@@ -94,18 +88,17 @@ final class UserRepositoryLive(
 
   override def addUser(
       user: User,
-      pwdCredentials: fi.kimmoeklund.domain.PasswordCredentials,
-      organization: Organization
+      pwdCredentials: domain.PasswordCredentials
   ): Task[Unit] = {
-    val members = Conv.toMember(user, organization)
-    val creds = Conv.toPasswordCredentialsTable(user, pwdCredentials)
+    val members = Transformers.toMember(user)
+    val creds = Transformers.toPasswordCredentialsTable(pwdCredentials)
     val ret =
       transaction {
         for {
           _ <- run(query[Members].insertValue(lift(members)))
           _ <- run(query[PasswordCredentials].insertValue(lift(creds)))
           _ <- run {
-            liftQuery(user.roles.map(Conv.toRoles)).foreach(r =>
+            liftQuery(user.roles.map(Transformers.toRoles)).foreach(r =>
               query[RoleGrants].insertValue(RoleGrants(r.id, lift(user.id)))
             )
           }
@@ -135,7 +128,7 @@ final class UserRepositoryLive(
       _ <- run(
         query[Permissions].insertValue(
           lift(
-            new Permissions(
+            Permissions(
               permission.id,
               permission.target,
               permission.permission
@@ -143,26 +136,27 @@ final class UserRepositoryLive(
           )
         )
       )
-    } yield ()
+    } yield (permission)
 
   override def getUsers: Task[List[User]] =
     val users = run {
       quote {
         for {
           m <- query[Members]
-          (rg, r, p) <- userJoinQuote(m)
-        } yield (m, rg, p, r)
+          (o, rg, r, p) <- userJoinQuote(m)
+        } yield (m, o, rg, p, r)
       }
     }.fold(
       _ => List(),
       list =>
         val members = list.map(_._1).distinct
-        val permissions = list.groupMap(_._4.get)(_._3)
-        val roles = list.groupMap(_._1)(_._4)
+        val permissions = list.groupMap(_._5.get)(_._4)
+        val roles = list.groupMap(_._1)(_._5)
         members.map(m =>
           User(
             m.id,
             m.name,
+            Organization(UUID.randomUUID(), "todo"),
             roles(m).flatMap(r =>
               r match {
                 case Some(r) =>
@@ -186,6 +180,26 @@ final class UserRepositoryLive(
         )
     )
     return users
+
+  override def getPermissions: Task[List[Permission]] =
+    val users = run {
+      quote {
+        query[Permissions]
+      }
+    }.fold(
+      _ => List(),
+      list =>
+        list.map(p => Permission(p.id, p.target, p.permission))
+    )
+    users
+
+  override def deletePermission(id: UUID): Task[Unit] = {
+    run {
+      quote {
+        query[Permissions].filter(p => p.id == lift(id)).delete
+      }
+    }.map(_ => ())
+  }
 
 object UserRepositoryLive:
   def layer: URLayer[Quill.Postgres[

@@ -1,2 +1,7 @@
 target
 .bloop
+.idea
+.bsp
+.bloop
+.vscode
+
