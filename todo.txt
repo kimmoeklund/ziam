@@ -71,4 +71,21 @@ htmx
 - generic validation of the form
 - function to turn form into entity
 
+////
+
+- basics of navigation
+    - menu should now where we are navigating to
+         -> build site as types Page (Permissions, Users, Roles)
+            -> build UI as patterns match based on routing
+            -> composition of views
+                - user count
+                - request counter
+
+- UI state -> page
+
+------
+
+- all in server rendering
+    - composability idea - but brings need to build whole UI framework. Small. Maybe. But still.
+- html pages with htmx
 
