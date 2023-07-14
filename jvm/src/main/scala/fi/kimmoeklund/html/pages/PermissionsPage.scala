@@ -13,30 +13,31 @@ import zio.http.html.Html.fromDomElement
 
 import java.util.UUID
 
-extension (p: Permission) {
-  def htmlTableRow: Dom = tr(
-    PartialAttribute("hx-target") := "this",
-    PartialAttribute("hx-swap") := "delete",
-    td(p.target),
-    td(p.permission.toString),
-    td(
-      button(
-        classAttr := "btn btn-danger" :: Nil,
-        "Delete",
-        PartialAttribute("hx-delete") := "/permissions/" + p.id.toString
-      )
-    )
-  )
-
-  def htmlTableRowSwap: Dom =
-    tBody(
-      PartialAttribute("hx-swap-oob") := "beforeend:#permissions-table",
-      htmlTableRow
-    )
-}
 
 object PermissionEffects extends Effects[UserRepository, Permission] with Renderer[Permission]:
-  def getEffect = for {
+  extension (p: Permission) {
+    def htmlTableRow: Dom = tr(
+      PartialAttribute("hx-target") := "this",
+      PartialAttribute("hx-swap") := "delete",
+      td(p.target),
+      td(p.permission.toString),
+      td(
+        button(
+          classAttr := "btn btn-danger" :: Nil,
+          "Delete",
+          PartialAttribute("hx-delete") := "/permissions/" + p.id.toString
+        )
+      )
+    )
+
+    def htmlTableRowSwap: Dom =
+      tBody(
+        PartialAttribute("hx-swap-oob") := "beforeend:#permissions-table",
+        htmlTableRow
+      )
+  }
+
+  override def getEffect = for {
     permissions <- UserRepository.getPermissions()
   } yield permissions
 
