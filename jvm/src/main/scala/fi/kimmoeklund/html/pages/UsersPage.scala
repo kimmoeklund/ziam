@@ -11,11 +11,12 @@ import fi.kimmoeklund.service.UserRepository
 
 extension (u: User) {
 
-  def htmlTableRow: Dom = tr(
+  def htmlTableRow2: Dom = tr(
     PartialAttribute("hx-target") := "this",
     PartialAttribute("hx-swap") := "delete",
     td(u.id.toString),
     td(u.name),
+    td(),
     td(u.organization.name),
     td(u.roles.mkString(", ")),
     td(
@@ -27,10 +28,10 @@ extension (u: User) {
     )
   )
 
-  def usersTableSwap: Dom =
+  def usersTableSwap2: Dom =
     tBody(
       PartialAttribute("hx-swap-oob") := "beforeend:#users-table",
-      htmlTableRow
+      htmlTableRow2
     )
 }
 
@@ -43,11 +44,12 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
         tr(
           th("Id"),
           th("Name"),
+          th("User login"),
           th("Organization"),
-          th("Roles"),
+          th("Roles"),                  
         )
       ),
-      tBody(id := "users-table", args.map(htmlTableRow))
+      tBody(id := "users-table", args.map(htmlTableRow2))
     )
 
   override def postItemRenderer(item: User): Html = ???

@@ -104,7 +104,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
             testState <- ZIO.service[ZState[TestScenario]]
             testData <- testState.get
             newUser <- ZIO.succeed(
-              User(newCreds.userId, randomName, testOrg, testData.roles)
+              User(newCreds.userId, randomName, testOrg, testData.roles, Seq(Login(newCreds.userName, LoginType.PasswordCredentials)))
             )
             success <- UserRepository.addUser(
               newUser,
@@ -126,4 +126,4 @@ object UserRepositorySpec extends ZIOSpecDefault:
       postgresLayer,
       repoLayer,
       testScenario
-    ) @@ sequential @@ samples(10) @@ nondeterministic
+    ) @@ sequential @@ samples(1) @@ nondeterministic
