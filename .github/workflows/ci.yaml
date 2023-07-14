@@ -1,0 +1,27 @@
+name: Ziam Bot CI
+on: push
+
+jobs:
+#  container-job:
+#    runs-on: ubuntu-latest
+#    container: ubuntu-latest
+#    services:
+#      image: postgres:latest
+#      volumes:
+#        - ./ziamJVM/src/main/resources/ziam_schema.sql:/docker-entrypoint-initdb.d/ziam_schema.sql
+#      env:
+#        - POSTGRES_USER: postgres
+#        - POSTGRES_PASSWORD: postgres
+#        - POSTGRES_DB: ziam
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+      - name: Build and Test
+        run: sbt -v +test
