@@ -1,8 +1,8 @@
 package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.Permission
+import fi.kimmoeklund.html.Renderer
 import fi.kimmoeklund.html.menu.menuHtml
-//import fi.kimmoeklund.html.pages.PermissionsPage.permissionTable
 import fi.kimmoeklund.html.{Effects, SiteMap, htmlSnippet, htmxHead, SimplePage}
 import fi.kimmoeklund.service.UserRepository
 import zio.*
@@ -31,23 +31,11 @@ extension (p: Permission) {
   def htmlTableRowSwap: Dom =
     tBody(
       PartialAttribute("hx-swap-oob") := "beforeend:#permissions-table",
-      tr(
-        PartialAttribute("hx-target") := "this",
-        PartialAttribute("hx-swap") := "delete",
-        td(p.target),
-        td(p.permission.toString),
-        td(
-          button(
-            classAttr := "btn btn-danger" :: Nil,
-            "Delete",
-            PartialAttribute("hx-delete") := "/permissions/" + p.id.toString
-          )
-        )
-      )
+      htmlTableRow
     )
 }
 
-object PermissionEffects extends Effects[UserRepository, Permission]:
+object PermissionEffects extends Effects[UserRepository, Permission] with Renderer[Permission]:
   def getEffect = for {
     permissions <- UserRepository.getPermissions()
   } yield permissions
@@ -114,44 +102,3 @@ object PermissionEffects extends Effects[UserRepository, Permission]:
 
 object PermissionsPage
     extends SimplePage(Root / "permissions", SiteMap.tabs.setActiveTab(SiteMap.permissionsTab), PermissionEffects)
-
-//  def buildHtml(permissions: List[Permission]): Dom =
-//    div(classAttr := "container" :: Nil, permissionTable(permissions))
-
-//def apply(): HttpApp[UserRepository, Nothing] = Http.collectZIO[Request] {
-//    case req @ Method.POST -> Root / "permissions" =>
-//      val effect = for {
-//        form <- req.body.asURLEncodedForm
-//        target <- ZIO.fromOption(form.get("target").get.stringValue)
-//        permission <- ZIO.fromOption(form.get("permission").get.stringValue)
-//        permissionInt <- ZIO.fromOption {
-//          try {
-//            (Some(permission.toInt))
-//          } catch {
-//            case e: NumberFormatException => None
-//          }
-//        }
-//        p <- UserRepository.addPermission(Permission(UUID.randomUUID(), target, permissionInt))
-//      } yield p
-//      effect.foldZIO(
-//        _ => ZIO.succeed(Response.status(Status.BadRequest)),
-//        p => ZIO.succeed(htmlSnippet(p.htmlTableRowSwap).addHeader("HX-Trigger-After-Swap", "myEvent"))
-//      )
-
-//    case Method.GET -> Root / "permissions" =>
-//      effect.foldZIO(
-//        _ => ZIO.succeed(Response.status(Status.InternalServerError)),
-//        (permissions: List[Permission]) => ZIO.succeed(Response.html(SiteMap.permissionsPage.htmlValue(permissions)))
-//      )
-
-//    case Method.DELETE -> Root / "permissions" / id =>
-//      val effect = for {
-//        uuid <- ZIO.fromOption(try {
-//          Some(UUID.fromString(id))
-//        } catch {
-//          case e: IllegalArgumentException => None
-//        })
-//        _ <- UserRepository.deletePermission(uuid)
-//      } yield ()
-//      effect.foldZIO(_ => ZIO.succeed(Response.status(Status.BadRequest)), _ => ZIO.succeed(Response.status(Status.Ok)))
-//  }

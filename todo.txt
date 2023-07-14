@@ -88,4 +88,9 @@ htmx
 - all in server rendering
     - composability idea - but brings need to build whole UI framework. Small. Maybe. But still.
 - html pages with htmx
+    - macros to a generic html like struct, like page rows
+    - benefit: a) compile time error if mapping is not possible (for example we could apply limit of columns or, if types too complex) b) inline instead of reflection
+        - recursive macros?
+        - why not use ducktape or shapeless
+    -
 

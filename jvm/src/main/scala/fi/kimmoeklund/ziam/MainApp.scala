@@ -31,7 +31,6 @@ object MainApp extends ZIOAppDefault:
   }
 
   def run = {
-    Server.serve(scriptsAndMainPage.withDefaultErrorResponse ++ PermissionsPage.httpValue
-    //  ++ PermissionsPage ++ UsersPage() ++ RolesPage()
+    Server.serve(scriptsAndMainPage.withDefaultErrorResponse ++ PermissionsPage.httpValue ++ UsersPage.httpValue ++ RolesPage.httpValue
     ).provide(Server.default, dataSourceLayer, postgresLayer, repoLayer)
   }

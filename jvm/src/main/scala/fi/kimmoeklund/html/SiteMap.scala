@@ -17,10 +17,4 @@ object SiteMap {
         rolesTab
     )
   )
-//  val permissionsPage: SimplePage[UserRepository, List[Permission]] = SimplePage(Root / "permissions", tabs.setActiveTab(permissionsTab), PermissionsPage)
-//  val usersPage: SimplePage[UserRepository, Unit] = SimplePage(Root / "users", tabs.setActiveTab(usersTab))
-//  val rolesPage: SimplePage[UserRepository, Unit] = SimplePage(Root / "roles", tabs.setActiveTab(rolesTab))
-
-  //def pages = List(permissionsPage, usersPage, rolesPage)
-
 }
