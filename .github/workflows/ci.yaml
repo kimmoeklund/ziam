@@ -2,17 +2,6 @@ name: Ziam Bot CI
 on: push
 
 jobs:
-#  container-job:
-#    runs-on: ubuntu-latest
-#    container: ubuntu-latest
-#    services:
-#      image: postgres:latest
-#      volumes:
-#        - ./ziamJVM/src/main/resources/ziam_schema.sql:/docker-entrypoint-initdb.d/ziam_schema.sql
-#      env:
-#        - POSTGRES_USER: postgres
-#        - POSTGRES_PASSWORD: postgres
-#        - POSTGRES_DB: ziam
   test:
     runs-on: ubuntu-latest
     steps:

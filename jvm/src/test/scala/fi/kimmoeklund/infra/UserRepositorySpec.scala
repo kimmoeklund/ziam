@@ -47,13 +47,14 @@ object UserRepositorySpec extends ZIOSpecDefault:
     val users = for {
       testData <- ZIO.serviceWithZIO[ZState[TestScenario]](_.get)
       userResults <- ZIO.collectAll(testData.credentials.map { creds =>
-        UserRepository.checkUserPassword(
+        for {
+          //_ <- Console.printLine(s"fetching user ${creds.userId}")
+          user <-  UserRepository.checkUserPassword(
           creds.userName,
           creds.password
-        )
+          )
+        } yield user
       })
-      _ <- Console.printLine(s"fetched ${userResults.size} users")
-
     } yield (userResults, testData.users, testData.roles)
 
     users.map((fetchedUsers, createdUsers, createdRoles) => {

@@ -39,9 +39,9 @@ final class UserRepositoryLive(
 
   import quill.*
 
-  private def userJoinQuote = quote { (m: Members) =>
+  private def userJoin = quote { (m: Members) =>
     for {
-      o <- query[Organization].join(o => o.id == m.organization)
+      o <- query[Members].leftJoin(o => o.id == m.organization)
       rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
       r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
       pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
@@ -49,18 +49,22 @@ final class UserRepositoryLive(
     } yield (o, rg, r, p)
   }
 
+
   override def checkUserPassword(
       userName: String,
       password: String
   ): Task[Option[User]] = {
     run {
-      quote {
         for {
           creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName) && p.password == lift(password))
           m <- query[Members].join(m => m.id == creds.memberId)
-          (o, pg, r, p) <- userJoinQuote(m)
+          o <- query[Members].leftJoin(o => o.id == m.organization)
+          rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
+          r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
+          pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
+          p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
+          //(o, pg, r, p) <- userJoin(m)
         } yield (m, o, r, p, creds)
-      }
     }.fold(
       _ => Option.empty,
       list => {
@@ -149,13 +153,11 @@ final class UserRepositoryLive(
 
   override def getUsers: Task[List[User]] =
     val users = run {
-      quote {
         for {
           m <- query[Members]
-          (o, rg, r, p) <- userJoinQuote(m)
+          (o, rg, r, p) <- userJoin(m)
           creds <- query[PasswordCredentials].leftJoin(creds => creds.memberId == m.id)
         } yield (m, o, rg, p, r, creds)
-      }
     }.fold(
       _ => List(),
       list =>
