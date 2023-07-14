@@ -38,6 +38,7 @@ final class UserRepositoryLive(
 ) extends UserRepository:
 
   import quill.*
+  import Transformers.*
 
   private def userJoin = quote { (m: Members) =>
     for {
@@ -48,6 +49,24 @@ final class UserRepositoryLive(
       p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
     } yield (o, rg, r, p)
   }
+
+  // attempts to make resusable part of for comprehension without quoted as above (which leads into dynamic query)
+//  private def userJoin2= (m: Members) => {
+//      query[Members].leftJoin(o => o.id == m.organization).flatMap(o => query[RoleGrants].leftJoin(rg => rg.memberId == m.id).flatMap(
+//        rg => query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId)).flatMap(
+//            r => query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId)).flatMap(
+//                pg => {
+//                  query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId)).flatMap({
+//                    p => (o, rg, r, p)
+//                  })
+//                }
+//                  ))))
+//                 // .flatMap(
+//                 //   p => (o, rg, r, p))))))
+//
+//                  //.map(
+//                  //  p => (o, rg, r, p))
+//  }
 
 
   override def checkUserPassword(
@@ -63,7 +82,6 @@ final class UserRepositoryLive(
           r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
           pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
           p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
-          //(o, pg, r, p) <- userJoin(m)
         } yield (m, o, r, p, creds)
     }.fold(
       _ => Option.empty,
@@ -103,15 +121,15 @@ final class UserRepositoryLive(
       user: User,
       pwdCredentials: domain.PasswordCredentials
   ): Task[Unit] = {
-    val members = Transformers.toMember(user)
-    val creds = Transformers.toPasswordCredentialsTable(pwdCredentials)
+    val members = toMember(user)
+    val creds = toPasswordCredentialsTable(pwdCredentials)
     val ret =
       transaction {
         for {
           _ <- run(query[Members].insertValue(lift(members)))
           _ <- run(query[PasswordCredentials].insertValue(lift(creds)))
           _ <- run {
-            liftQuery(user.roles.map(Transformers.toRoles)).foreach(r =>
+            liftQuery(user.roles.map(toRoles)).foreach(r =>
               query[RoleGrants].insertValue(RoleGrants(r.id, lift(user.id)))
             )
           }
@@ -155,7 +173,11 @@ final class UserRepositoryLive(
     val users = run {
         for {
           m <- query[Members]
-          (o, rg, r, p) <- userJoin(m)
+          o <- query[Members].leftJoin(o => o.id == m.organization)
+          rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
+          r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
+          pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
+          p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
           creds <- query[PasswordCredentials].leftJoin(creds => creds.memberId == m.id)
         } yield (m, o, rg, p, r, creds)
     }.fold(
