@@ -37,7 +37,7 @@ object PermissionEffects extends Effects[UserRepository, Permission] with Render
       )
   }
 
-  def getEffect = for {
+  override def getEffect = for {
     permissions <- UserRepository.getPermissions()
   } yield permissions
 

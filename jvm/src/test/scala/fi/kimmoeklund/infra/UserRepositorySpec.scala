@@ -94,7 +94,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
             )
             role <- UserRepository.addRole(newRole)
             _ <- testState.update(data => data.copy(roles = data.roles :+ newRole))
-          } yield assertTrue(role == ())
+          } yield assertTrue(role == newRole)
         }
       },
       test("it should add user to the database") {

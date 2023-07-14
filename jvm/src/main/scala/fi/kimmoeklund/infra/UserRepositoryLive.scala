@@ -137,12 +137,13 @@ final class UserRepositoryLive(
       }
     return ret
   }
-  override def addRole(role: Role): Task[Unit] =
-    val ret = transaction {
+  override def addRole(role: Role): Task[Role] =
+    val newRole = Roles(role.id, role.name)
+    transaction {
       for {
-        _ <-
-          run(query[Roles].insertValue(lift(new Roles(role.id, role.name))))
-        _ <-
+        r <-
+          run(query[Roles].insertValue(lift(newRole)))
+        rg <-
           run {
             liftQuery(role.permissions).foreach(p =>
               query[PermissionGrants].insertValue(
@@ -150,9 +151,8 @@ final class UserRepositoryLive(
               )
             )
           }
-      } yield ()
-    }
-    return ret
+      } yield (newRole)
+    }.map(r => r.into[Role].transform(Field.const(_.permissions, role.permissions)))
 
   override def addPermission(permission: Permission) =
     for {
@@ -238,6 +238,23 @@ final class UserRepositoryLive(
       }
     }.map(_ => ())
   }
+
+  override def getRoles: Task[List[Role]] = run {
+      for {
+        roles <- query[Roles]
+        pg <- query[PermissionGrants].leftJoin(pg => roles.id == pg.roleId)
+        p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
+      } yield (roles, pg, p)
+    }.fold(
+      _ => List(),
+      list => List()
+    )
+//      .fold(
+//      _ => List(),
+//     list => list.map(r => Role(r.id, r.name, List()))
+//    )
+//    roles
+end UserRepositoryLive
 
 object UserRepositoryLive:
   def layer: URLayer[Quill.Postgres[

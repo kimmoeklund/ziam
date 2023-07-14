@@ -10,7 +10,7 @@ trait UserRepository:
 
   def addUser(user: User, pwdCredentials: PasswordCredentials): Task[Unit]
 
-  def addRole(role: Role): Task[Unit]
+  def addRole(role: Role): Task[Role]
 
   def addPermission(permission: Permission): Task[Permission]
   
@@ -19,6 +19,8 @@ trait UserRepository:
   def effectivePermissionsForUser(id: String): Task[Option[Seq[Permission]]]
 
   def getUsers: Task[List[User]]
+
+  def getRoles: Task[List[Role]]
 
   def getPermissions: Task[List[Permission]]
 
@@ -31,7 +33,7 @@ object UserRepository:
   def addUser(user: User, pwdCredentials: PasswordCredentials): ZIO[UserRepository, Throwable, Unit] =
     ZIO.serviceWithZIO[UserRepository](_.addUser(user, pwdCredentials))
 
-  def addRole(role: Role): ZIO[UserRepository, Throwable, Unit] =
+  def addRole(role: Role): ZIO[UserRepository, Throwable, Role] =
     ZIO.serviceWithZIO[UserRepository](_.addRole(role))
 
   def addPermission(permission: Permission): ZIO[UserRepository, Throwable, Permission] =
@@ -45,6 +47,9 @@ object UserRepository:
 
   def getUsers(): ZIO[UserRepository, Throwable, List[User]] = 
     ZIO.serviceWithZIO[UserRepository](_.getUsers)
+
+  def getRoles(): ZIO[UserRepository, Throwable, List[Role]] =
+    ZIO.serviceWithZIO[UserRepository](_.getRoles)
 
   def getPermissions(): ZIO[UserRepository, Throwable, List[Permission]] =
     ZIO.serviceWithZIO[UserRepository](_.getPermissions)
