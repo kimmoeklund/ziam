@@ -1,7 +1,7 @@
 package fi.kimmoeklund.infra
 
 import fi.kimmoeklund.domain
-import fi.kimmoeklund.domain.{Organization, Permission, Role, User}
+import fi.kimmoeklund.domain.{Organization, Permission, Role, User, Login, LoginType}
 
 import java.util.UUID
 import fi.kimmoeklund.service.UserRepository
@@ -59,7 +59,7 @@ final class UserRepositoryLive(
           creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName) && p.password == lift(password))
           m <- query[Members].join(m => m.id == creds.memberId)
           (o, pg, r, p) <- userJoinQuote(m)
-        } yield (m, o, r, p)
+        } yield (m, o, r, p, creds)
       }
     }.fold(
       _ => Option.empty,
@@ -76,7 +76,16 @@ final class UserRepositoryLive(
                 .map(p => new Permission(p.id, p.target, p.permission))
             )
           )
-        Some(new User(list.head._1.id, list.head._1.name, Organization(UUID.randomUUID(), "todo"), domainRoles))
+        val passwordCredentials = list.head._5
+        Some(
+          new User(
+            list.head._1.id,
+            list.head._1.name,
+            Organization(UUID.randomUUID(), "todo"),
+            domainRoles,
+            Seq(Login(passwordCredentials.userName, LoginType.PasswordCredentials))
+          )
+        )
       }
     )
   }
@@ -144,7 +153,8 @@ final class UserRepositoryLive(
         for {
           m <- query[Members]
           (o, rg, r, p) <- userJoinQuote(m)
-        } yield (m, o, rg, p, r)
+          creds <- query[PasswordCredentials].leftJoin(creds => creds.memberId == m.id)
+        } yield (m, o, rg, p, r, creds)
       }
     }.fold(
       _ => List(),
@@ -152,6 +162,7 @@ final class UserRepositoryLive(
         val members = list.map(_._1).distinct
         val permissions = list.groupMap(_._5.get)(_._4)
         val roles = list.groupMap(_._1)(_._5)
+        val creds = list.groupMap(_._1)(_._6)
         members.map(m =>
           User(
             m.id,
@@ -175,7 +186,11 @@ final class UserRepositoryLive(
                   )
                 case None => List()
               }
-            )
+            ),
+            creds(m).flatMap({
+              case Some(c) => Seq(Login(c.userName, LoginType.PasswordCredentials))
+              case None    => Seq()
+            })
           )
         )
     )
@@ -188,8 +203,7 @@ final class UserRepositoryLive(
       }
     }.fold(
       _ => List(),
-      list =>
-        list.map(p => Permission(p.id, p.target, p.permission))
+      list => list.map(p => Permission(p.id, p.target, p.permission))
     )
     users
 
