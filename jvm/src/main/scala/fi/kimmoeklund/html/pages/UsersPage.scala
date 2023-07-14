@@ -34,7 +34,7 @@ extension (u: User) {
     )
 }
 
-object UserEffects extends Effects[UserRepository, User] with Renderer[User]:
+object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
 
   override def listRenderer(args: List[User]): Html =
     table(
@@ -60,4 +60,4 @@ object UserEffects extends Effects[UserRepository, User] with Renderer[User]:
     users <- UserRepository.getUsers()
   } yield users
 
-object UsersPage extends SimplePage(Root / "users", SiteMap.tabs.setActiveTab(SiteMap.usersTab), UserEffects)
+object UsersPage extends SimplePage(Root / "users", SiteMap.tabs.setActiveTab(SiteMap.usersTab), UsersEffects)

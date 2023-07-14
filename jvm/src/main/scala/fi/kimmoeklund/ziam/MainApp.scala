@@ -1,8 +1,9 @@
 package fi.kimmoeklund.ziam
 
-import fi.kimmoeklund.html.pages.{PermissionsPage, RolesPage, UsersPage}
+import fi.kimmoeklund.html.pages.{PermissionsPage, RolesPage, UsersPage, UsersEffects}
 import fi.kimmoeklund.infra.UserRepositoryLive
 import fi.kimmoeklund.html.SiteMap
+import fi.kimmoeklund.domain.User
 import zio.*
 import zio.logging.{LogFormat, console}
 import zio.http.*
@@ -24,11 +25,11 @@ object MainApp extends ZIOAppDefault:
   private val repoLayer = UserRepositoryLive.layer
   private val requestCounter = Metric.counter("requestCounter").fromConst(0)
 
-  private val scriptsAndMainPage = Http.collectHttp[Request] {
+  private val scriptsAndMainPage = Http.collectHttp[Request]:
     case Method.GET -> Root / "scripts" =>
       Http.fromFile(new File("js/target/scala-3.3.0/ziam-fastopt/main.js"))
-    //case Method.GET -> Root => Handler.fromFunction(_ => Response.html(SiteMap.usersPage.htmlValue(()))).toHttp
-  }
+    case Method.GET -> Root => Handler.response(Response.redirect(URL(UsersPage.path))).toHttp
+   
 
   def run = {
     Server.serve(scriptsAndMainPage.withDefaultErrorResponse ++ PermissionsPage.httpValue ++ UsersPage.httpValue ++ RolesPage.httpValue
