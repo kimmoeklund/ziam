@@ -64,9 +64,19 @@ object PermissionEffects extends Effects[UserRepository, Permission] with Render
     _ <- UserRepository.deletePermission(uuid)
   } yield ()
 
-  override def postItemRenderer(item: Permission): Html = item.htmlTableRowSwap
+  override def postResult(item: Permission): Html = item.htmlTableRowSwap
 
-  override def listRenderer(permissions: List[Permission]): Html = {
+  override def optionsList(args: List[Permission]): Html =
+    val targetMap = args.groupMap(_.target)(p => p)
+    var targets = targetMap.keys.toList
+    targets.map(t =>
+      optgroup(
+        labelAttr := t,
+        targetMap(t).map(p => option(p.permission.toString, valueAttr := p.id.toString))
+      )
+    )
+
+  override def htmlTable(permissions: List[Permission]): Html = {
     table(
       classAttr := "table" :: Nil,
       tHead(

@@ -15,10 +15,12 @@ import fi.kimmoeklund.service.UserRepository
 import io.getquill.SnakeCase
 import io.getquill.Escape
 import io.getquill.NamingStrategy
+import org.junit.Assert
 
 import scala.collection.mutable.ListBuffer
 
 final case class TestScenario(
+    organization: Organization,
     users: List[User],
     roles: List[Role],
     permissions: List[Permission],
@@ -28,7 +30,7 @@ final case class TestScenario(
 val testOrg = Organization(UUID.randomUUID(), "test org")
 
 object TestScenario:
-  def create: TestScenario = TestScenario(List(), List(), List(), List())
+  def create: TestScenario = TestScenario(testOrg,List(), List(), List(), List())
 
 object UserRepositorySpec extends ZIOSpecDefault:
 
@@ -97,6 +99,13 @@ object UserRepositorySpec extends ZIOSpecDefault:
           } yield assertTrue(role == newRole)
         }
       },
+      test("it should add organization to the database") {
+        for {
+          testState <- ZIO.service[ZState[TestScenario]]
+          testData <- testState.get
+          org <- UserRepository.addOrganization(testData.organization)
+        } yield assertTrue(org == testData.organization)
+      },
       test("it should add user to the database") {
         check(unicodeString, asciiString) { (randomName, userName) =>
           val newCreds =
@@ -117,8 +126,31 @@ object UserRepositorySpec extends ZIOSpecDefault:
                 users = data.users :+ newUser
               )
             )
-          } yield assertTrue(success == ())
+          } yield assertTrue(success == newUser)
         }
+      },
+      test("it should get and delete permission from the database") {
+        for {
+            permission <- UserRepository.addPermission(Permission(UUID.randomUUID(), "test permission", 1))
+            _ <- UserRepository.deletePermission(permission.id)
+            allPermissions <- UserRepository.getPermissions()
+        } yield assertTrue(!allPermissions.exists(p => p.id == permission.id))
+      },
+      test(label = "it should get permissions by id") {
+        for {
+          testState <- ZIO.service[ZState[TestScenario]]
+          testData <- testState.get
+          permissions <- UserRepository.getPermissionsById(testData.permissions.map(p => p.id))
+        } yield assertTrue(permissions == testData.permissions)
+      },
+      test("it should delete roles from the database") {
+        for {
+          testState <- ZIO.service[ZState[TestScenario]]
+          testData <- testState.get
+          role <- UserRepository.addRole(Role(UUID.randomUUID(), "test role", testData.permissions))
+          _ <- UserRepository.deleteRole(role.id)
+          allRoles <- UserRepository.getRoles()
+        } yield assertTrue(!allRoles.exists(r => r.id == role.id))
       }
     ) + suite("fetch users")(fetchUsers)).provideShared(
       containerLayer,
