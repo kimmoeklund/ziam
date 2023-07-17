@@ -50,24 +50,27 @@ final class UserRepositoryLive(
     } yield (o, rg, r, p)
   }
 
-  // attempts to make resusable part of for comprehension without quoted as above (which leads into dynamic query)
-//  private def userJoin2= (m: Members) => {
-//      query[Members].leftJoin(o => o.id == m.organization).flatMap(o => query[RoleGrants].leftJoin(rg => rg.memberId == m.id).flatMap(
-//        rg => query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId)).flatMap(
-//            r => query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId)).flatMap(
-//                pg => {
-//                  query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId)).flatMap({
-//                    p => (o, rg, r, p)
-//                  })
-//                }
-//                  ))))
-//                 // .flatMap(
-//                 //   p => (o, rg, r, p))))))
-//
-//                  //.map(
-//                  //  p => (o, rg, r, p))
-//  }
-
+  private def mapUsers(users: List[(Members, Members, Option[Roles], Option[Permissions], Option[PasswordCredentials])]) =
+      val members = users.map(_._1).distinct
+      val organizations = users.groupMap(_._1)(_._2)
+      val permissions = users.groupMap(_._3.get)(_._4)
+      val roles = users.groupMap(_._1)(_._3)
+      val creds = users.groupMap(_._1)(_._5)
+      members.map(m =>
+        User(
+          m.id,
+          m.name,
+          organizations(m).head.to[Organization],
+          roles(m).flatten.map(r =>
+            Role(
+              r.id,
+              r.name,
+              permissions(r).flatten.map(p => Permission(p.id, p.target, p.permission))
+            )
+          ),
+          creds(m).flatten.map(c => Login(c.userName, LoginType.PasswordCredentials))
+        )
+      )
 
   override def checkUserPassword(
       userName: String,
@@ -77,7 +80,7 @@ final class UserRepositoryLive(
         for {
           creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName) && p.password == lift(password))
           m <- query[Members].join(m => m.id == creds.memberId)
-          o <- query[Members].leftJoin(o => o.id == m.organization)
+          o <- query[Members].join(o => o.id == m.organization)
           rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
           r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
           pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
@@ -85,46 +88,38 @@ final class UserRepositoryLive(
         } yield (m, o, r, p, creds)
     }.fold(
       _ => Option.empty,
-      list => {
-        val organization = list.head._2
-        val roles = list.flatMap(_._3).distinct
-        val permissions = list.flatMap(_._4).distinct
-        val domainRoles = roles
-          .map(r =>
-            new Role(
-              r.id,
-              r.name,
-              permissions
-                .map(p => new Permission(p.id, p.target, p.permission))
-            )
-          )
-        val passwordCredentials = list.head._5
-        Some(
-          new User(
-            list.head._1.id,
-            list.head._1.name,
-            Organization(UUID.randomUUID(), "todo"),
-            domainRoles,
-            Seq(Login(passwordCredentials.userName, LoginType.PasswordCredentials))
-          )
-        )
-      }
+      list =>
+        val updated = list.map(u => (u._1, u._2, u._3, u._4, Option(u._5)))
+        val users = mapUsers(updated)
+        if (users.isEmpty) Option.empty else Some(users.head)
     )
   }
 
-  override def updateUserRoles(): Task[Option[User]] = ???
+  override def updateUserRoles: Task[Option[User]] = ???
   override def effectivePermissionsForUser(
       id: String
   ): Task[Option[Seq[Permission]]] = ???
 
+  override def addOrganization(org: Organization): Task[Organization] =
+    run {
+      query[Members].insertValue(
+        lift(
+          Members(
+            org.id,
+            org.id,
+            org.name
+          )
+        )
+      )
+    }.map(_ => org)
+
   override def addUser(
       user: User,
       pwdCredentials: domain.PasswordCredentials
-  ): Task[Unit] = {
+  ): Task[User] = {
     val members = toMember(user)
     val creds = toPasswordCredentialsTable(pwdCredentials)
-    val ret =
-      transaction {
+    transaction {
         for {
           _ <- run(query[Members].insertValue(lift(members)))
           _ <- run(query[PasswordCredentials].insertValue(lift(creds)))
@@ -133,21 +128,20 @@ final class UserRepositoryLive(
               query[RoleGrants].insertValue(RoleGrants(r.id, lift(user.id)))
             )
           }
-        } yield ()
+        } yield (user)
       }
-    return ret
   }
   override def addRole(role: Role): Task[Role] =
     val newRole = Roles(role.id, role.name)
     transaction {
       for {
-        r <-
+        _ <-
           run(query[Roles].insertValue(lift(newRole)))
-        rg <-
+        _ <-
           run {
             liftQuery(role.permissions).foreach(p =>
               query[PermissionGrants].insertValue(
-                new PermissionGrants(lift(role.id), p.id)
+                PermissionGrants(lift(role.id), p.id)
               )
             )
           }
@@ -169,77 +163,47 @@ final class UserRepositoryLive(
       )
     } yield (permission)
 
-  override def getUsers: Task[List[User]] =
-    val users = run {
+  override def getUsers: Task[List[User]] = run {
         for {
           m <- query[Members]
-          o <- query[Members].leftJoin(o => o.id == m.organization)
+          o <- query[Members].join(o => o.id == m.organization)
           rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
           r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
           pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
           p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
           creds <- query[PasswordCredentials].leftJoin(creds => creds.memberId == m.id)
-        } yield (m, o, rg, p, r, creds)
+        } yield (m, o, r, p, creds)
     }.fold(
       _ => List(),
-      list =>
-        val members = list.map(_._1).distinct
-        val permissions = list.groupMap(_._5.get)(_._4)
-        val roles = list.groupMap(_._1)(_._5)
-        val creds = list.groupMap(_._1)(_._6)
-        members.map(m =>
-          User(
-            m.id,
-            m.name,
-            Organization(UUID.randomUUID(), "todo"),
-            roles(m).flatMap(r =>
-              r match {
-                case Some(r) =>
-                  List(
-                    Role(
-                      r.id,
-                      r.name,
-                      permissions(r).flatMap(p =>
-                        p match {
-                          case Some(p) =>
-                            List(Permission(p.id, p.target, p.permission))
-                          case None => List()
-                        }
-                      )
-                    )
-                  )
-                case None => List()
-              }
-            ),
-            creds(m).flatMap({
-              case Some(c) => Seq(Login(c.userName, LoginType.PasswordCredentials))
-              case None    => Seq()
-            })
-          )
-        )
+      list => mapUsers(list)
     )
-    return users
 
   override def getPermissions: Task[List[Permission]] =
     val users = run {
-      quote {
-        query[Permissions]
-      }
+      query[Permissions]
     }.fold(
       _ => List(),
       list => list.map(p => Permission(p.id, p.target, p.permission))
     )
     users
 
+  override def getPermissionsById(ids: Seq[UUID]): Task[List[Permission]] = {
+    run { quote { query[Permissions].filter(p => liftQuery(ids).contains(p.id)) }}.map(l => l.map(p => p.to[Permission]))
+  }
+
   override def deletePermission(id: UUID): Task[Unit] = {
     run {
-      quote {
-        query[Permissions].filter(p => p.id == lift(id)).delete
-      }
+      query[Permissions].filter(p => p.id == lift(id)).delete
     }.map(_ => ())
   }
 
-  override def getRoles: Task[List[Role]] = run {
+  override def deleteRole(id: UUID): Task[Unit] =
+    run {
+      query[Roles].filter(r => r.id == lift(id)).delete
+    }.map(_ => ())
+
+  override def getRoles: Task[List[Role]] = {
+    run {
       for {
         roles <- query[Roles]
         pg <- query[PermissionGrants].leftJoin(pg => roles.id == pg.roleId)
@@ -247,13 +211,17 @@ final class UserRepositoryLive(
       } yield (roles, pg, p)
     }.fold(
       _ => List(),
-      list => List()
+      list =>
+        val permissionsMap = list.groupMap(_._1)(_._3)
+        list.map(r =>
+          Role(
+            r._1.id,
+            r._1.name,
+            permissionsMap(r._1).flatten.map(p => Permission(p.id, p.target, p.permission))
+          )
+        ).distinct
     )
-//      .fold(
-//      _ => List(),
-//     list => list.map(r => Role(r.id, r.name, List()))
-//    )
-//    roles
+  }
 end UserRepositoryLive
 
 object UserRepositoryLive:

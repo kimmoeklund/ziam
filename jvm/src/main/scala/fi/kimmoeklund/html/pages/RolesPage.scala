@@ -3,10 +3,11 @@ package fi.kimmoeklund.html.pages
 import fi.kimmoeklund.domain.Role
 import zio.*
 import zio.http.{html as _, *}
-import zio.http.html.{th, *}
+import zio.http.html.{option, th, *}
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
 import fi.kimmoeklund.html.{Effects, Renderer, SimplePage, SiteMap}
+
 import java.util.UUID
 import fi.kimmoeklund.service.UserRepository
 
@@ -30,7 +31,7 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
 
     def htmlTableRowSwap: Dom =
       tBody(
-        PartialAttribute("hx-swap-oob") := "beforeend:#roles-table",
+        PartialAttribute("hx-swap-oob") := "beforeend:#roles_table",
         htmlTableRow
       )
   }
@@ -42,7 +43,15 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
   def postEffect(request: Request) = for {
     form <- request.body.asURLEncodedForm
     name <- ZIO.fromOption(form.get("name").get.stringValue)
-    r <- UserRepository.addRole(Role(UUID.randomUUID(), name, Seq()))
+    inputUuids <- ZIO.fromOption(form.get("permissions").get.stringValue.map(s => s.split(",").map(uuidStr =>
+      try {
+        Some(UUID.fromString(uuidStr))
+      } catch {
+        case e: IllegalArgumentException => None
+      })))
+    permissions <- UserRepository.getPermissionsById(inputUuids.flatten.toList)
+    _ <- ZIO.logInfo(inputUuids.mkString(","))
+    r <- UserRepository.addRole(Role(UUID.randomUUID(), name, permissions))
   } yield r
 
   override def deleteEffect(id: String) = for {
@@ -51,45 +60,45 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
     } catch {
       case e: IllegalArgumentException => None
     })
-    _ <- UserRepository.deletePermission(uuid)
+    _ <- UserRepository.deleteRole(uuid)
   } yield ()
 
-  override def postItemRenderer(item: Role): Html = item.htmlTableRowSwap
+  override def postResult(item: Role): Html = item.htmlTableRowSwap
 
-  override def listRenderer(permissions: List[Role]): Html = {
+  override def htmlTable(roles: List[Role]): Html = {
     table(
       classAttr := "table" :: Nil,
       tHead(
         tr(
-          th("Target"),
-          th("Permission")
+          th("Role"),
+          th("ID"),
+          th("Permissions")
         )
       ),
-      tBody(id := "permissions-table", permissions.map(htmlTableRow))
+      tBody(id := "roles_table", roles.map(htmlTableRow))
     ) ++
       form(
-        idAttr := "add-permission",
-        PartialAttribute("hx-post") := "/permissions",
+        idAttr := "add_role",
+        PartialAttribute("hx-post") := "/roles",
         PartialAttribute("hx-swap") := "none",
         label(
-          "Target",
-          forAttr := "target",
-          input(idAttr := "target", nameAttr := "target", classAttr := "form-control" :: Nil, typeAttr := "text")
+          "Role name",
+          forAttr := "name",
+          input(idAttr := "name", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text")
         ),
         label(
-          "Permission",
-          forAttr := "permission",
-          input(
-            id := "permission",
-            nameAttr := "permission",
-            classAttr := "form-control" :: Nil,
-            typeAttr := "text"
-          )
+          "Permissions",
+          forAttr := "permissions"),
+        select(idAttr := "permissions", multipleAttr := "multiple", nameAttr := "permissions", PartialAttribute("hx-get") := "/permissions/options", PartialAttribute("hx-trigger") := "revealed",
+          PartialAttribute("hx-target") := "#permissions", PartialAttribute("hx-swap") := "innerHTML",
+  //        div(idAttr := "permissions_options")
         ),
-        button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
+          button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
       ) ++
       script(srcAttr := "/scripts")
   }
+
+  override def optionsList(args: List[Role]): Html = ???
 }
 
 object RolesPage extends SimplePage(Root / "roles", SiteMap.tabs.setActiveTab(SiteMap.rolesTab), RolesEffects)

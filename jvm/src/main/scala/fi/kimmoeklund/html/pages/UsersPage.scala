@@ -30,14 +30,14 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
       )
     )
 
-    def usersTableSwap2: Dom =
+    def usersTableSwap: Dom =
       tBody(
         PartialAttribute("hx-swap-oob") := "beforeend:#users-table",
         htmlTableRow
       )
   }
 
-  override def listRenderer(args: List[User]): Html =
+  override def htmlTable(args: List[User]): Html =
     table(
       classAttr := "table" :: Nil,
       tHead(
@@ -94,11 +94,13 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
       button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
     )
 
-  override def postItemRenderer(item: User): Html = ???
+  override def postResult(item: User): Html = ???
 
   override def postEffect(req: Request): ZIO[UserRepository, Option[Nothing] | Throwable, User] = ???
 
   override def deleteEffect(id: String): ZIO[UserRepository, Option[Nothing] | Throwable, Unit] = ???
+
+  override def optionsList(args: List[User]): Html = ???
 
   def getEffect = for {
     users <- UserRepository.getUsers()

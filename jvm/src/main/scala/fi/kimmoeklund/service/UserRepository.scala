@@ -1,6 +1,6 @@
 package fi.kimmoeklund.service
 
-import fi.kimmoeklund.domain.{PasswordCredentials, Permission, Role, User}
+import fi.kimmoeklund.domain.{Organization, PasswordCredentials, Permission, Role, User}
 import zio.*
 
 import java.util.UUID
@@ -8,13 +8,15 @@ import java.util.UUID
 trait UserRepository:
   def checkUserPassword(userName: String, password: String): Task[Option[User]]
 
-  def addUser(user: User, pwdCredentials: PasswordCredentials): Task[Unit]
+  def addUser(user: User, pwdCredentials: PasswordCredentials): Task[User]
 
   def addRole(role: Role): Task[Role]
 
+  def addOrganization(org: Organization): Task[Organization]
+
   def addPermission(permission: Permission): Task[Permission]
   
-  def updateUserRoles(): Task[Option[User]]
+  def updateUserRoles: Task[Option[User]]
   
   def effectivePermissionsForUser(id: String): Task[Option[Seq[Permission]]]
 
@@ -24,13 +26,20 @@ trait UserRepository:
 
   def getPermissions: Task[List[Permission]]
 
+  def getPermissionsById(ids: Seq[UUID]): Task[List[Permission]]
+
   def deletePermission(id: UUID): Task[Unit]
+
+  def deleteRole(id: UUID): Task[Unit]
 
 object UserRepository:
   def checkUserPassword(userName: String, password: String): ZIO[UserRepository, Throwable, Option[User]] =
     ZIO.serviceWithZIO[UserRepository](_.checkUserPassword(userName, password))
 
-  def addUser(user: User, pwdCredentials: PasswordCredentials): ZIO[UserRepository, Throwable, Unit] =
+  def addOrganization(org: Organization): ZIO[UserRepository, Throwable, Organization] =
+    ZIO.serviceWithZIO[UserRepository](_.addOrganization(org))
+
+  def addUser(user: User, pwdCredentials: PasswordCredentials): ZIO[UserRepository, Throwable, User] =
     ZIO.serviceWithZIO[UserRepository](_.addUser(user, pwdCredentials))
 
   def addRole(role: Role): ZIO[UserRepository, Throwable, Role] =
@@ -40,7 +49,7 @@ object UserRepository:
     ZIO.serviceWithZIO[UserRepository](_.addPermission(permission))
 
   def updateUserRoles(): ZIO[UserRepository, Throwable, Option[User]] =
-    ZIO.serviceWithZIO[UserRepository](_.updateUserRoles())
+    ZIO.serviceWithZIO[UserRepository](_.updateUserRoles)
 
   def effectivePermissionsForUser(id: String): ZIO[UserRepository, Throwable, Option[Seq[Permission]]] = 
     ZIO.serviceWithZIO[UserRepository](_.effectivePermissionsForUser(id))
@@ -54,5 +63,11 @@ object UserRepository:
   def getPermissions(): ZIO[UserRepository, Throwable, List[Permission]] =
     ZIO.serviceWithZIO[UserRepository](_.getPermissions)
 
+  def getPermissionsById(ids: Seq[UUID]): ZIO[UserRepository, Throwable, List[Permission]] =
+    ZIO.serviceWithZIO[UserRepository](_.getPermissionsById(ids))
+
   def deletePermission(id: UUID): ZIO[UserRepository, Throwable, Unit] =
     ZIO.serviceWithZIO[UserRepository](_.deletePermission(id))
+
+  def deleteRole(id: UUID): ZIO[UserRepository, Throwable, Unit] =
+    ZIO.serviceWithZIO[UserRepository](_.deleteRole(id))

@@ -18,8 +18,9 @@ trait Effects[R,T]:
   def deleteEffect(id: String): ZIO[R, Option[Nothing] | Throwable, Unit]
 
 trait Renderer[T]:
-  def listRenderer(args: List[T]): Html
-  def postItemRenderer(item: T): Html
+  def htmlTable(args: List[T]): Html
+  def postResult(item: T): Html
+  def optionsList(args: List[T]): Html
 
 trait Menu extends StaticHtml:
   val items: List[MenuItem]
@@ -46,17 +47,22 @@ case class TabMenu(items: List[Tab | ActiveTab]) extends Menu:
   }
 
 case class SimplePage[R,T](path: Path, menu: Menu, functions: Effects[R,T] & Renderer[T]):
-  def htmlValue(contentArgs: List[T]): Html =
-    html(htmxHead ++ body(div(classAttr := "container" :: Nil, menu.htmlValue, functions.listRenderer(contentArgs))))
 
+  def htmlValue(contentArgs: List[T]): Html =
+    html(htmxHead ++ body(div(classAttr := "container" :: Nil, menu.htmlValue, functions.htmlTable(contentArgs))))
 
   def httpValue: HttpApp[R, Nothing] = Http.collectZIO[Request]:
+    case Method.GET -> this.path / format => functions.getEffect.foldZIO(_ => ZIO.succeed(Response.status(Status.InternalServerError)),
+      (result: List[T]) => format match
+          case "options" => ZIO.succeed(htmlSnippet(functions.optionsList(result)))
+          case _ => ZIO.succeed(Response.html(htmlValue(result))))
+
     case Method.GET -> this.path => functions.getEffect.foldZIO(_ => ZIO.succeed(Response.status(Status.InternalServerError)),
       (result: List[T]) => ZIO.succeed(Response.html(htmlValue(result))))
 
     case req @ Method.POST -> this.path => functions.postEffect(req).foldZIO(
       _ => ZIO.succeed(Response.status(Status.BadRequest)),
-      p => ZIO.succeed(htmlSnippet(functions.postItemRenderer(p)).addHeader("HX-Trigger-After-Swap", "myEvent")))
+      p => ZIO.succeed(htmlSnippet(functions.postResult(p)).addHeader("HX-Trigger-After-Swap", "myEvent")))
 
     case Method.DELETE -> this.path / id => functions.deleteEffect(id).foldZIO(_ => ZIO.succeed(Response.status(Status.BadRequest)),
       _ => ZIO.succeed(Response.status(Status.Ok)))
