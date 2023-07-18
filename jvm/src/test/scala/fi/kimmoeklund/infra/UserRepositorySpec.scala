@@ -24,13 +24,12 @@ final case class TestScenario(
     users: List[User],
     roles: List[Role],
     permissions: List[Permission],
-    credentials: List[PasswordCredentials]
 )
 
 val testOrg = Organization(UUID.randomUUID(), "test org")
 
 object TestScenario:
-  def create: TestScenario = TestScenario(testOrg,List(), List(), List(), List())
+  def create: TestScenario = TestScenario(testOrg,List(), List(), List())
 
 object UserRepositorySpec extends ZIOSpecDefault:
 
@@ -48,12 +47,12 @@ object UserRepositorySpec extends ZIOSpecDefault:
   ]] =
     val users = for {
       testData <- ZIO.serviceWithZIO[ZState[TestScenario]](_.get)
-      userResults <- ZIO.collectAll(testData.credentials.map { creds =>
+      userResults <- ZIO.collectAll(testData.users.map { user =>
         for {
           //_ <- Console.printLine(s"fetching user ${creds.userId}")
           user <-  UserRepository.checkUserPassword(
-          creds.userName,
-          creds.password
+          user.logins.head.userName,
+          user.logins.head.userName
           )
         } yield user
       })
@@ -107,26 +106,20 @@ object UserRepositorySpec extends ZIOSpecDefault:
         } yield assertTrue(org == testData.organization)
       },
       test("it should add user to the database") {
-        check(unicodeString, asciiString) { (randomName, userName) =>
-          val newCreds =
-            domain.PasswordCredentials(UUID.randomUUID(), userName, userName)
+        check(unicodeString, asciiString) { (randomName, userName) => {
+          val userId = UUID.randomUUID()
           for {
             testState <- ZIO.service[ZState[TestScenario]]
             testData <- testState.get
-            newUser <- ZIO.succeed(
-              User(newCreds.userId, randomName, testOrg, testData.roles, Seq(Login(newCreds.userName, LoginType.PasswordCredentials)))
-            )
-            success <- UserRepository.addUser(
-              newUser,
-              newCreds
-            )
+            newPassword <- ZIO.fromOption(NewPasswordCredentials(userId, userName, userName, userName))
+            success <- UserRepository.addUser(NewPasswordUser(userId, randomName, testOrg, newPassword, testData.roles))
             _ <- testState.update(data =>
               data.copy(
-                credentials = data.credentials :+ newCreds,
-                users = data.users :+ newUser
+                users = data.users :+ success
               )
             )
-          } yield assertTrue(success == newUser)
+          } yield assertTrue(success.id == newPassword.userId)
+          }
         }
       },
       test("it should get and delete permission from the database") {
@@ -151,7 +144,14 @@ object UserRepositorySpec extends ZIOSpecDefault:
           _ <- UserRepository.deleteRole(role.id)
           allRoles <- UserRepository.getRoles()
         } yield assertTrue(!allRoles.exists(r => r.id == role.id))
-      }
+      },
+      test(label = "it should delete organization") {
+        for {
+          org <- UserRepository.addOrganization(Organization(UUID.randomUUID(), "test org2"))
+            _ <- UserRepository.deleteOrganization(org.id)
+          allOrgs <- UserRepository.getOrganizations()
+        } yield assertTrue(!allOrgs.exists(o => o.id == org.id))
+      },
     ) + suite("fetch users")(fetchUsers)).provideShared(
       containerLayer,
       DataSourceBuilderLive.layer,

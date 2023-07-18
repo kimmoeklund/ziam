@@ -6,7 +6,7 @@ services:
     restart: always
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
-      - ./ziamJVM/src/main/resources/ziam_schema.sql:/docker-entrypoint-initdb.d/ziam_schema.sql
+      - ./jvm/src/main/resources/ziam_schema.sql:/docker-entrypoint-initdb.d/ziam_schema.sql
     environment:
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: postgres

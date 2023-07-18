@@ -31,7 +31,7 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
 
     def htmlTableRowSwap: Dom =
       tBody(
-        PartialAttribute("hx-swap-oob") := "beforeend:#roles_table",
+        PartialAttribute("hx-swap-oob") := "beforeend:#roles-table",
         htmlTableRow
       )
   }
@@ -75,30 +75,40 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
           th("Permissions")
         )
       ),
-      tBody(id := "roles_table", roles.map(htmlTableRow))
+      tBody(id := "roles-table", roles.map(htmlTableRow))
     ) ++
       form(
-        idAttr := "add_role",
+        idAttr := "add-role",
         PartialAttribute("hx-post") := "/roles",
         PartialAttribute("hx-swap") := "none",
-        label(
-          "Role name",
-          forAttr := "name",
-          input(idAttr := "name", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text")
+        div(classAttr := "mb-3" :: Nil,
+          label(
+            "Role name",
+            forAttr := "name-field",
+            classAttr := "form-label" :: Nil,
+          ),
+          input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text"),
         ),
-        label(
-          "Permissions",
-          forAttr := "permissions"),
-        select(idAttr := "permissions", multipleAttr := "multiple", nameAttr := "permissions", PartialAttribute("hx-get") := "/permissions/options", PartialAttribute("hx-trigger") := "revealed",
-          PartialAttribute("hx-target") := "#permissions", PartialAttribute("hx-swap") := "innerHTML",
-  //        div(idAttr := "permissions_options")
+        div(classAttr := "mb-3" :: Nil,
+          label(
+            "Permissions",
+            classAttr := "form-label" :: Nil,
+            forAttr := "permissions-select"),
+          select(idAttr := "permissions-select", classAttr := "form-select" :: Nil, multipleAttr := "multiple",
+            nameAttr := "permissions",
+            PartialAttribute("hx-params") := "none",
+            PartialAttribute("hx-get") := "/permissions/options",
+            PartialAttribute("hx-trigger") := "revealed",
+            PartialAttribute("hx-target") := "#permissions-select",
+            PartialAttribute("hx-swap") := "innerHTML"),
         ),
-          button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
+        button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
       ) ++
       script(srcAttr := "/scripts")
   }
 
-  override def optionsList(args: List[Role]): Html = ???
+  override def optionsList(args: List[Role]): Html =
+    args.map(r => option(r.name, valueAttr := r.id.toString))
 }
 
 object RolesPage extends SimplePage(Root / "roles", SiteMap.tabs.setActiveTab(SiteMap.rolesTab), RolesEffects)

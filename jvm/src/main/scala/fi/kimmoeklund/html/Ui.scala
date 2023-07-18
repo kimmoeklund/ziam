@@ -62,7 +62,7 @@ case class SimplePage[R,T](path: Path, menu: Menu, functions: Effects[R,T] & Ren
 
     case req @ Method.POST -> this.path => functions.postEffect(req).foldZIO(
       _ => ZIO.succeed(Response.status(Status.BadRequest)),
-      p => ZIO.succeed(htmlSnippet(functions.postResult(p)).addHeader("HX-Trigger-After-Swap", "myEvent")))
+      p => ZIO.succeed(htmlSnippet(functions.postResult(p)).addHeader("HX-Trigger-After-Swap", "resetAndFocusForm")))
 
     case Method.DELETE -> this.path / id => functions.deleteEffect(id).foldZIO(_ => ZIO.succeed(Response.status(Status.BadRequest)),
       _ => ZIO.succeed(Response.status(Status.Ok)))
