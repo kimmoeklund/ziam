@@ -40,20 +40,10 @@ final class UserRepositoryLive(
   import quill.*
   import Transformers.*
 
-  private def userJoin = quote { (m: Members) =>
-    for {
-      o <- query[Members].leftJoin(o => o.id == m.organization)
-      rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
-      r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
-      pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
-      p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
-    } yield (o, rg, r, p)
-  }
-
   private def mapUsers(users: List[(Members, Members, Option[Roles], Option[Permissions], Option[PasswordCredentials])]) =
       val members = users.map(_._1).distinct
       val organizations = users.groupMap(_._1)(_._2)
-      val permissions = users.groupMap(_._3.get)(_._4)
+      val permissions = users.groupMap(_._3.orNull)(_._4)
       val roles = users.groupMap(_._1)(_._3)
       val creds = users.groupMap(_._1)(_._5)
       members.map(m =>
@@ -61,14 +51,14 @@ final class UserRepositoryLive(
           m.id,
           m.name,
           organizations(m).head.to[Organization],
-          roles(m).flatten.map(r =>
+          roles(m).flatten.distinct.map(r =>
             Role(
               r.id,
               r.name,
               permissions(r).flatten.map(p => Permission(p.id, p.target, p.permission))
             )
           ),
-          creds(m).flatten.map(c => Login(c.userName, LoginType.PasswordCredentials))
+          creds(m).flatten.distinct.map(c => Login(c.userName, LoginType.PasswordCredentials))
         )
       )
 
@@ -82,16 +72,15 @@ final class UserRepositoryLive(
           m <- query[Members].join(m => m.id == creds.memberId)
           o <- query[Members].join(o => o.id == m.organization)
           rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
-          r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
-          pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
-          p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
+          r <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
+          pg <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
+          p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
         } yield (m, o, r, p, creds)
     }.fold(
       _ => Option.empty,
       list =>
-        val updated = list.map(u => (u._1, u._2, u._3, u._4, Option(u._5)))
-        val users = mapUsers(updated)
-        if (users.isEmpty) Option.empty else Some(users.head)
+        val user = mapUsers(list.map((m, o, r, p, c) => (m, o, r, p, Some(c))))
+        if (user.isEmpty) Option.empty else Some(user.head)
     )
   }
 
@@ -172,7 +161,6 @@ final class UserRepositoryLive(
           creds <- query[PasswordCredentials].leftJoin(creds => creds.memberId == m.id)
         } yield (m, o, r, p, creds)
     }
-    .tap(list => ZIO.logInfo(list.map(row => s"m: ${row._1.toString}\n, o: ${row._2.toString}\n, rg: ${row._3.toString}\n, r: ${row._4.toString}").mkString("\n")))
     .fold(
       _ => List(),
       list => mapUsers(list)
