@@ -1,6 +1,6 @@
 package fi.kimmoeklund.html.pages
 
-import fi.kimmoeklund.domain.User
+import fi.kimmoeklund.domain.{NewPasswordCredentials, NewPasswordUser, PasswordCredentials, User}
 import zio.*
 import zio.http.{html as _, *}
 import zio.http.html.*
@@ -8,6 +8,8 @@ import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
 import fi.kimmoeklund.html.{Effects, Renderer, SimplePage, SiteMap}
 import fi.kimmoeklund.service.UserRepository
+
+import java.util.UUID
 
 object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
 
@@ -20,7 +22,7 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
       td(u.name),
       td(u.logins.map(_.userName).mkString(",")),
       td(u.organization.name),
-      td(u.roles.mkString(", ")),
+      td(u.roles.map(_.name).mkString(", ")),
       td(
         button(
           classAttr := "btn btn-danger" :: Nil,
@@ -56,49 +58,68 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
       PartialAttribute("hx-swap") := "none",
       label(
         "Name",
-        forAttr := "Name",
-        input(idAttr := "name", nameAttr := "Name", classAttr := "form-control" :: Nil, typeAttr := "text")
+        forAttr := "name-field",
+        classAttr := "form-label" :: Nil
       ),
+      input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text"),
       label(
         "Username",
-        forAttr := "username",
-        input(
-          id := "username",
-          nameAttr := "username",
-          classAttr := "form-control" :: Nil,
-          typeAttr := "text"
-        )
-      ),
+        classAttr := "form-label" :: Nil,
+        forAttr := "username-field"),
+      input(
+        id := "username-field",
+      nameAttr := "username",
+      classAttr := "form-control" :: Nil,
+      typeAttr := "text"),
       label(
         "Password",
-        forAttr := "password",
-        input(
-          id := "password",
-          nameAttr := "password",
-          classAttr := "form-control" :: Nil,
-          typeAttr := "password"
-        ),
-        input(
-          id := "password_confirmation",
-          nameAttr := "password_confirmation",
-          classAttr := "form-control" :: Nil,
-          typeAttr := "password"
-        ),
-        input(
-          nameAttr := "organization",
-          classAttr := "form-control" :: Nil,
-          typeAttr := "hidden",
-          valueAttr := "37a6f38f-1d7c-4553-a2a0-6481ab5b8c8d"
-        )
+        classAttr := "form-label" :: Nil,
+        forAttr := "password-field",
       ),
+      input(
+        id := "password-field",
+        nameAttr := "password",
+        classAttr := "form-control" :: Nil,
+        typeAttr := "password"
+      ),
+      input(
+        id := "password-confirmation",
+        nameAttr := "password-confirmation",
+        classAttr := "form-control" :: Nil,
+        typeAttr := "password"
+      ),
+      select(idAttr := "organization-select", classAttr := "form-select" :: Nil,
+        nameAttr := "organization",
+        PartialAttribute("hx-get") := "/organizations/options",
+        PartialAttribute("hx-trigger") := "revealed",
+        PartialAttribute("hx-params") := "none",
+        PartialAttribute("hx-target") := "#organization-select",
+        PartialAttribute("hx-swap") := "innerHTML"),
       button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
     )
 
-  override def postResult(item: User): Html = ???
+  override def postResult(item: User): Html = item.usersTableSwap
 
-  override def postEffect(req: Request): ZIO[UserRepository, Option[Nothing] | Throwable, User] = ???
+  override def postEffect(req: Request): ZIO[UserRepository, Option[Nothing] | Throwable, User] =
+    val userId = UUID.randomUUID()
+    for {
+      form <- req.body.asURLEncodedForm
+      name <- ZIO.fromOption(form.get("name").get.stringValue)
+      username <- ZIO.fromOption(form.get("username").get.stringValue)
+      password <- ZIO.fromOption(form.get("password").get.stringValue)
+      passwordConfirmation <- ZIO.fromOption(form.get("password-confirmation").get.stringValue)
+      orgIdString <- ZIO.fromOption(form.get("organization").get.stringValue)
+      orgUUid <- ZIO.attempt(UUID.fromString(orgIdString))
+      orgOpt <- UserRepository.getOrganizationById(orgUUid)
+      organization <- ZIO.fromOption(orgOpt)
+      passwordCredentials <- ZIO.fromOption(NewPasswordCredentials(userId, username, password, passwordConfirmation))
+      user <- UserRepository.addUser(NewPasswordUser(userId, name, organization, passwordCredentials, List()))
+  } yield (user)
 
-  override def deleteEffect(id: String): ZIO[UserRepository, Option[Nothing] | Throwable, Unit] = ???
+  override def deleteEffect(id: String): ZIO[UserRepository, Option[Nothing] | Throwable, Unit] = for {
+    uuid <- ZIO.attempt(UUID.fromString(id))
+    _ <- UserRepository.deleteUser(uuid)
+  } yield ()
 
   override def optionsList(args: List[User]): Html = ???
 

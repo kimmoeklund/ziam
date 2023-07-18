@@ -1,7 +1,7 @@
 package fi.kimmoeklund.infra
 
 import fi.kimmoeklund.domain
-import fi.kimmoeklund.domain.{Organization, Permission, Role, User, Login, LoginType}
+import fi.kimmoeklund.domain.{Login, LoginType, NewPasswordUser, Organization, Permission, Role, User}
 
 import java.util.UUID
 import fi.kimmoeklund.service.UserRepository
@@ -26,10 +26,10 @@ case class PasswordCredentials(
 )
 
 object Transformers:
-  def toMember(user: User): Members =
+  def toMember(user: NewPasswordUser): Members =
     user.into[Members].transform(Field.computed(_.organization, u => u.organization.id))
   def toPasswordCredentialsTable(
-      creds: domain.PasswordCredentials
+      creds: domain.NewPasswordCredentials
   ): PasswordCredentials = creds.into[PasswordCredentials].transform(Field.renamed(_.memberId, _.userId))
   def toRoles(role: Role): Roles = role.to[Roles]
 
@@ -114,11 +114,9 @@ final class UserRepositoryLive(
     }.map(_ => org)
 
   override def addUser(
-      user: User,
-      pwdCredentials: domain.PasswordCredentials
-  ): Task[User] = {
+      user: NewPasswordUser): Task[User] = {
     val members = toMember(user)
-    val creds = toPasswordCredentialsTable(pwdCredentials)
+    val creds = toPasswordCredentialsTable(user.credentials)
     transaction {
         for {
           _ <- run(query[Members].insertValue(lift(members)))
@@ -128,7 +126,7 @@ final class UserRepositoryLive(
               query[RoleGrants].insertValue(RoleGrants(r.id, lift(user.id)))
             )
           }
-        } yield (user)
+        } yield (User(user.id, user.name, user.organization, user.roles, Seq(Login(creds.userName, LoginType.PasswordCredentials))))
       }
   }
   override def addRole(role: Role): Task[Role] =
@@ -165,19 +163,20 @@ final class UserRepositoryLive(
 
   override def getUsers: Task[List[User]] = run {
         for {
-          m <- query[Members]
-          o <- query[Members].join(o => o.id == m.organization)
+          m <- query[Members].filter(m => m.organization != m.id)
+          o <- query[Members].join(o => o.organization == m.organization)
           rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
-          r <- query[Roles].leftJoin(r => rg.forall(grant => r.id == grant.roleId))
-          pg <- query[PermissionGrants].leftJoin(pg => r.forall(role => role.id == pg.roleId))
-          p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
+          r <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
+          pg <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
+          p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
           creds <- query[PasswordCredentials].leftJoin(creds => creds.memberId == m.id)
         } yield (m, o, r, p, creds)
-    }.fold(
+    }
+    .tap(list => ZIO.logInfo(list.map(row => s"m: ${row._1.toString}\n, o: ${row._2.toString}\n, rg: ${row._3.toString}\n, r: ${row._4.toString}").mkString("\n")))
+    .fold(
       _ => List(),
       list => mapUsers(list)
     )
-
   override def getPermissions: Task[List[Permission]] =
     val users = run {
       query[Permissions]
@@ -222,6 +221,32 @@ final class UserRepositoryLive(
         ).distinct
     )
   }
+
+  override def getOrganizations: Task[List[Organization]] =
+    run {
+      query[Members].filter(m => m.id == m.organization)
+    }.fold(
+      _ => List(),
+        list => list.map(m => Organization(m.id, m.name))
+    )
+
+  override def deleteOrganization(id: UUID): Task[Unit] =
+    run {
+      query[Members].filter(o => o.id == lift(id)).delete
+    }.map(_ => ())
+
+  override def getOrganizationById(id: UUID): Task[Option[Organization]] =
+    run {
+      query[Members].filter(o => o.id == lift(id) && o.id == o.organization)
+    }.fold(
+        _ => Option.empty,
+        list => list.map(m => Organization(m.id, m.name)).headOption
+    )
+
+  override def deleteUser(id: UUID): Task[Unit] = run {
+      query[Members].filter(m => m.id == lift(id)).delete
+    }.map(_ => ())
+
 end UserRepositoryLive
 
 object UserRepositoryLive:

@@ -11,14 +11,16 @@ object Scripts {
   }
 
   def registerEventHandler() = {
-    document.getElementById("add-permission").addEventListener("myEvent", (e: dom.Event) => {
-      println("myEvent received")
-      val form = e.target.asInstanceOf[dom.HTMLFormElement]
-      form.reset()
-      form.elements.find({
-        case _: Input => true
-        case _ => false
-      }).get.asInstanceOf[Input].focus()
-    })
+    val forms = document.forms.headOption
+    if (forms.isDefined) {
+      document.forms.head.addEventListener("resetAndFocusForm", (e: dom.Event) => {
+        val form = e.target.asInstanceOf[dom.HTMLFormElement]
+        form.reset()
+        form.elements.find({
+          case _: Input => true
+          case _ => false
+        }).get.asInstanceOf[Input].focus()
+      })
+    }
   }
 }

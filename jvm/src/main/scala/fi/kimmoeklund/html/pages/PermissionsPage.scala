@@ -68,8 +68,7 @@ object PermissionEffects extends Effects[UserRepository, Permission] with Render
 
   override def optionsList(args: List[Permission]): Html =
     val targetMap = args.groupMap(_.target)(p => p)
-    var targets = targetMap.keys.toList
-    targets.map(t =>
+    targetMap.keys.toList.map(t =>
       optgroup(
         labelAttr := t,
         targetMap(t).map(p => option(p.permission.toString, valueAttr := p.id.toString))
