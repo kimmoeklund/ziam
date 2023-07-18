@@ -50,7 +50,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
       userResults <- ZIO.collectAll(testData.users.map { user =>
         for {
           //_ <- Console.printLine(s"fetching user ${creds.userId}")
-          user <-  UserRepository.checkUserPassword(
+          user <- UserRepository.checkUserPassword(
           user.logins.head.userName,
           user.logins.head.userName
           )
@@ -61,10 +61,10 @@ object UserRepositorySpec extends ZIOSpecDefault:
     users.map((fetchedUsers, createdUsers, createdRoles) => {
       createdUsers.map(cUser => {
         test("it should check password for created user") {
-          val fUser = fetchedUsers.find(fu => fu.get.id == cUser.id).get.get
-          assertTrue(cUser._1 == fUser._1)
-          assertTrue(cUser._2 == fUser._2)
-          assertTrue(fUser.roles.forall(fRole => {
+          val fUser = fetchedUsers.find(fu => fu.get.id == cUser.id)
+          assertTrue(cUser._1 == fUser.orNull.orNull._1)
+          assertTrue(cUser._2 == fUser.orNull.orNull._2)
+          assertTrue(fUser.orNull.orNull.roles.forall(fRole => {
             val cRole = createdRoles.find(cr => cr._1 == fRole._1).get
             cRole.permissions.sorted == fRole.permissions.sorted
           }))

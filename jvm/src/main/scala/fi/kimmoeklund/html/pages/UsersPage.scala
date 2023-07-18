@@ -20,7 +20,7 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
       PartialAttribute("hx-swap") := "delete",
       td(u.id.toString),
       td(u.name),
-      td(u.logins.map(_.userName).mkString(",")),
+      td(u.logins.map(l => s"${l.userName} (${l.loginType.toString})").mkString(",")),
       td(u.organization.name),
       td(u.roles.map(_.name).mkString(", ")),
       td(
@@ -125,6 +125,7 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
 
   def getEffect = for {
     users <- UserRepository.getUsers()
+    _ <- ZIO.logInfo(users.map(u => u.toString).mkString(","))
   } yield users
 
 object UsersPage extends SimplePage(Root / "users", SiteMap.tabs.setActiveTab(SiteMap.usersTab), UsersEffects)

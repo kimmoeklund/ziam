@@ -2,6 +2,7 @@ package fi.kimmoeklund.html
 
 import fi.kimmoeklund.service.UserRepository
 import zio.*
+import zio.http.Status.InternalServerError
 import zio.http.{html as _, *}
 import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
@@ -52,12 +53,18 @@ case class SimplePage[R,T](path: Path, menu: Menu, functions: Effects[R,T] & Ren
     html(htmxHead ++ body(div(classAttr := "container" :: Nil, menu.htmlValue, functions.htmlTable(contentArgs))))
 
   def httpValue: HttpApp[R, Nothing] = Http.collectZIO[Request]:
-    case Method.GET -> this.path / format => functions.getEffect.foldZIO(_ => ZIO.succeed(Response.status(Status.InternalServerError)),
+    case Method.GET -> this.path / format => functions.getEffect.foldZIO(e => ZIO.succeed(Response.text(e.getMessage).withStatus(Status.InternalServerError)),
       (result: List[T]) => format match
           case "options" => ZIO.succeed(htmlSnippet(functions.optionsList(result)))
           case _ => ZIO.succeed(Response.html(htmlValue(result))))
 
-    case Method.GET -> this.path => functions.getEffect.foldZIO(_ => ZIO.succeed(Response.status(Status.InternalServerError)),
+    case Method.GET -> this.path => functions.getEffect.foldZIO(e => {
+      for {
+        _ <- ZIO.logInfo(e.getMessage)
+        _ <- ZIO.logInfo(e.getStackTrace.mkString("\n"))
+        response <- ZIO.succeed(Response.text(e.getMessage).withStatus(Status.InternalServerError))
+      } yield response
+    },
       (result: List[T]) => ZIO.succeed(Response.html(htmlValue(result))))
 
     case req @ Method.POST -> this.path => functions.postEffect(req).foldZIO(
