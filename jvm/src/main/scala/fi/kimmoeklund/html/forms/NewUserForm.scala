@@ -47,11 +47,11 @@ object NewUserForm:
       uuid <- Validation.fromTry(Try(UUID.fromString(uuidStr))).mapError(_ => OrganizationIdInvalid)
     } yield uuid
 
-    val roleIdsValidation = (for {
-      roleIdsStr <-
-        if roleIds.isEmpty then Validation.succeed("") else Validation.fromOption(roleIds.flatMap(_.stringValue))
-      roleIds <- Validation.fromTry(Try(roleIdsStr.split(",").map(UUID.fromString).toSet))
-    } yield roleIds).mapError(_ => RoleIdsInvalid)
+    val roleIdsValidation = Validation
+      .fromTry(
+        Try(if roleIds.isEmpty then Set() else roleIds.get.stringValue.get.split(",").map(UUID.fromString).toSet)
+      )
+      .mapError(_ => RoleIdsInvalid)
 
     val newPassword = NewPasswordCredentials.fromOptions(
       userName.flatMap(_.stringValue),
