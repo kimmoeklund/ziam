@@ -25,6 +25,7 @@ lazy val ziam = crossProject(JSPlatform, JVMPlatform).in(file("."))
       "ch.qos.logback" % "logback-classic" % logbackClassicVersion,
       "com.outr" %% "scalapass" % "1.2.5",
       "io.github.arainko" %% "ducktape" % "0.1.8",
+      "dev.zio" %% "zio-prelude" % "1.0.0-RC19",
       "dev.zio" %% "zio-test" % zioVersion % Test,
       "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
       "dev.zio" %% "zio-test-junit" % zioVersion % Test,
