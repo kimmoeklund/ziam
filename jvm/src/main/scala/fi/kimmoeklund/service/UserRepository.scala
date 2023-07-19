@@ -1,6 +1,6 @@
 package fi.kimmoeklund.service
 
-import fi.kimmoeklund.domain.{NewPasswordUser, Organization, PasswordCredentials, Permission, Role, User}
+import fi.kimmoeklund.domain.{NewPasswordUser, Organization, PasswordCredentials, Permission, Role, User, Errors}
 import zio.*
 
 import java.util.UUID
@@ -23,6 +23,8 @@ trait UserRepository:
   def getUsers: Task[List[User]]
 
   def getRoles: Task[List[Role]]
+
+  def getRolesByIds(ids: Seq[UUID]): Task[List[Role]]
 
   def getOrganizations: Task[List[Organization]]
 
@@ -67,6 +69,9 @@ object UserRepository:
 
   def getRoles(): ZIO[UserRepository, Throwable, List[Role]] =
     ZIO.serviceWithZIO[UserRepository](_.getRoles)
+
+  def getRolesByIds(ids: Seq[UUID]): ZIO[UserRepository, Throwable, List[Role]] =
+    ZIO.serviceWithZIO[UserRepository](_.getRolesByIds(ids))
 
   def getPermissions(): ZIO[UserRepository, Throwable, List[Permission]] =
     ZIO.serviceWithZIO[UserRepository](_.getPermissions)

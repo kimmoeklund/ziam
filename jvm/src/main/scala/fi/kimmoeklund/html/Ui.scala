@@ -1,5 +1,6 @@
 package fi.kimmoeklund.html
 
+import fi.kimmoeklund.domain.ErrorCode
 import fi.kimmoeklund.service.UserRepository
 import zio.*
 import zio.http.Status.InternalServerError
@@ -15,7 +16,7 @@ trait StaticHtml:
 
 trait Effects[R,T]:
   def getEffect: ZIO[R, Throwable, List[T]]
-  def postEffect(req: Request): ZIO[R, Option[Nothing] | Throwable , T]
+  def postEffect(req: Request): ZIO[R, Option[Nothing] | ErrorCode | Throwable , T]
   def deleteEffect(id: String): ZIO[R, Option[Nothing] | Throwable, Unit]
 
 trait Renderer[T]:
@@ -68,7 +69,11 @@ case class SimplePage[R,T](path: Path, menu: Menu, functions: Effects[R,T] & Ren
       (result: List[T]) => ZIO.succeed(Response.html(htmlValue(result))))
 
     case req @ Method.POST -> this.path => functions.postEffect(req).foldZIO(
-      _ => ZIO.succeed(Response.status(Status.BadRequest)),
+      {
+        case e: ErrorCode => ZIO.succeed(Response.text(e.toString).withStatus(Status.BadRequest))
+        case t: Throwable => ZIO.succeed(Response.text(t.getMessage).withStatus(Status.InternalServerError))
+        case _ => ZIO.succeed(Response.text("error not yet available").withStatus(Status.BadRequest))
+      },
       p => ZIO.succeed(htmlSnippet(functions.postResult(p)).addHeader("HX-Trigger-After-Swap", "resetAndFocusForm")))
 
     case Method.DELETE -> this.path / id => functions.deleteEffect(id).foldZIO(_ => ZIO.succeed(Response.status(Status.BadRequest)),

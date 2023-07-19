@@ -1,10 +1,11 @@
 package fi.kimmoeklund.html
 
-import fi.kimmoeklund.domain.Permission
+import fi.kimmoeklund.domain.{ErrorCode, Permission}
 import zio.http.{html as _, *}
 import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
+import zio.prelude.Validation
 
 def htmxHead: Dom = {
   head(
@@ -32,3 +33,14 @@ def htmlSnippet(data: Html, status: Status = Status.Ok): Response = {
     Body.fromCharSequence(data.encode)
   )
 }
+
+// Option[field] => validation string or validation UUID
+
+//extension(form: Form):
+//  def validate[A](fields: String*): Validation[ErrorCode, A] =
+//    fields.collect(f => {
+//      val value = this.get(f)      
+//    })
+//  
+    
+  

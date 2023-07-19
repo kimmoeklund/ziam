@@ -1,35 +1,29 @@
 package fi.kimmoeklund.infra
 
 import fi.kimmoeklund.domain
-import io.getquill.PluralizedTableNames
+import fi.kimmoeklund.domain.*
+import fi.kimmoeklund.service.UserRepository
 import io.getquill.jdbczio.Quill
+import io.getquill.{Escape, NamingStrategy, PluralizedTableNames, SnakeCase}
 import zio.*
 import zio.test.*
 import zio.test.Assertion.*
 import zio.test.TestAspect.*
-import io.getquill.PluralizedTableNames
-import fi.kimmoeklund.domain.*
 
 import java.util.UUID
-import fi.kimmoeklund.service.UserRepository
-import io.getquill.SnakeCase
-import io.getquill.Escape
-import io.getquill.NamingStrategy
-import org.junit.Assert
-
 import scala.collection.mutable.ListBuffer
 
 final case class TestScenario(
     organization: Organization,
     users: List[User],
     roles: List[Role],
-    permissions: List[Permission],
+    permissions: List[Permission]
 )
 
 val testOrg = Organization(UUID.randomUUID(), "test org")
 
 object TestScenario:
-  def create: TestScenario = TestScenario(testOrg,List(), List(), List())
+  def create: TestScenario = TestScenario(testOrg, List(), List(), List())
 
 object UserRepositorySpec extends ZIOSpecDefault:
 
@@ -39,7 +33,8 @@ object UserRepositorySpec extends ZIOSpecDefault:
     Quill.Postgres.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
   val repoLayer = UserRepositoryLive.layer
   val testScenario = ZState.initial(TestScenario.create)
-  val unicodeString = Gen.stringBounded(5, 100)(Gen.unicodeChar)
+  val unicodeString =
+    Gen.stringBounded(5, 100)(Gen.unicodeChar.filter(c => c != 0x00.toChar && !c.isControl && !c.isWhitespace))
   val asciiString = Gen.stringBounded(3, 12)(Gen.alphaNumericChar)
 
   def fetchUsers: ZIO[ZState[TestScenario] & UserRepository, Throwable, List[
@@ -49,10 +44,10 @@ object UserRepositorySpec extends ZIOSpecDefault:
       testData <- ZIO.serviceWithZIO[ZState[TestScenario]](_.get)
       userResults <- ZIO.collectAll(testData.users.map { user =>
         for {
-          //_ <- Console.printLine(s"fetching user ${creds.userId}")
+          // _ <- Console.printLine(s"fetching user ${creds.userId}")
           user <- UserRepository.checkUserPassword(
-          user.logins.head.userName,
-          user.logins.head.userName
+            user.logins.head.userName,
+            user.logins.head.userName
           )
         } yield user
       })
@@ -106,27 +101,30 @@ object UserRepositorySpec extends ZIOSpecDefault:
         } yield assertTrue(org == testData.organization)
       },
       test("it should add user to the database") {
-        check(unicodeString, asciiString) { (randomName, userName) => {
-          val userId = UUID.randomUUID()
-          for {
-            testState <- ZIO.service[ZState[TestScenario]]
-            testData <- testState.get
-            newPassword <- ZIO.fromOption(NewPasswordCredentials(userId, userName, userName, userName))
-            success <- UserRepository.addUser(NewPasswordUser(userId, randomName, testOrg, newPassword, testData.roles))
-            _ <- testState.update(data =>
-              data.copy(
-                users = data.users :+ success
+        check(unicodeString, asciiString) { (randomName, userName) =>
+          {
+            val userId = UUID.randomUUID()
+            for {
+              testState <- ZIO.service[ZState[TestScenario]]
+              testData <- testState.get
+              newPassword <- NewPasswordCredentials.fromOptions(Some(userName), Some(userName), Some(userName)).toZIO
+              success <- UserRepository.addUser(
+                NewPasswordUser(userId, randomName, testOrg, newPassword, testData.roles)
               )
-            )
-          } yield assertTrue(success.id == newPassword.userId)
+              _ <- testState.update(data =>
+                data.copy(
+                  users = data.users :+ success
+                )
+              )
+            } yield assertTrue(success.logins.size == 1 && success.logins.head.userName == userName)
           }
         }
       },
       test("it should get and delete permission from the database") {
         for {
-            permission <- UserRepository.addPermission(Permission(UUID.randomUUID(), "test permission", 1))
-            _ <- UserRepository.deletePermission(permission.id)
-            allPermissions <- UserRepository.getPermissions()
+          permission <- UserRepository.addPermission(Permission(UUID.randomUUID(), "test permission", 1))
+          _ <- UserRepository.deletePermission(permission.id)
+          allPermissions <- UserRepository.getPermissions()
         } yield assertTrue(!allPermissions.exists(p => p.id == permission.id))
       },
       test(label = "it should get permissions by id") {
@@ -148,15 +146,17 @@ object UserRepositorySpec extends ZIOSpecDefault:
       test(label = "it should delete organization") {
         for {
           org <- UserRepository.addOrganization(Organization(UUID.randomUUID(), "test org2"))
-            _ <- UserRepository.deleteOrganization(org.id)
+          _ <- UserRepository.deleteOrganization(org.id)
           allOrgs <- UserRepository.getOrganizations()
         } yield assertTrue(!allOrgs.exists(o => o.id == org.id))
-      },
-    ) + suite("fetch users")(fetchUsers)).provideShared(
-      containerLayer,
-      DataSourceBuilderLive.layer,
-      dataSourceLayer,
-      postgresLayer,
-      repoLayer,
-      testScenario
-    ) @@ sequential @@ samples(1) @@ nondeterministic
+      }
+    )
+      + suite("fetch users")(fetchUsers))
+      .provideShared(
+        containerLayer,
+        DataSourceBuilderLive.layer,
+        dataSourceLayer,
+        postgresLayer,
+        repoLayer,
+        testScenario
+      ) @@ sequential @@ samples(10) @@ nondeterministic
