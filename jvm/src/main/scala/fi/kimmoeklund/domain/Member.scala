@@ -12,7 +12,6 @@ enum LoginType {
 
 case class Login(userName: String, loginType: LoginType)
 
-case class Group(id: UUID, name: String) extends Member
 case class User(id: UUID, name: String, organization: Organization, roles: Seq[Role], logins: Seq[Login]) extends Member
 case class Organization(id: UUID, name: String) extends Member
 case class NewPasswordUser(id: UUID, name: String, organization: Organization, credentials: NewPasswordCredentials, roles: Seq[Role])
