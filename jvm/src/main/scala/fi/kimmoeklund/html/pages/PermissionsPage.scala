@@ -1,18 +1,18 @@
 package fi.kimmoeklund.html.pages
 
+import fi.kimmoeklund.domain.FormError.*
 import fi.kimmoeklund.domain.Permission
-import fi.kimmoeklund.html.Renderer
+import fi.kimmoeklund.html.*
 import fi.kimmoeklund.html.menu.menuHtml
-import fi.kimmoeklund.html.{Effects, SiteMap, htmlSnippet, htmxHead, SimplePage}
 import fi.kimmoeklund.service.UserRepository
 import zio.*
-import zio.http.{html as _, *}
 import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
+import zio.http.{html as _, *}
 
 import java.util.UUID
-
+import scala.util.Try
 
 object PermissionEffects extends Effects[UserRepository, Permission] with Renderer[Permission]:
   extension (p: Permission) {
@@ -42,25 +42,17 @@ object PermissionEffects extends Effects[UserRepository, Permission] with Render
   } yield permissions
 
   def postEffect(request: Request) = for {
-    form <- request.body.asURLEncodedForm
-    target <- ZIO.fromOption(form.get("target").get.stringValue)
-    permission <- ZIO.fromOption(form.get("permission").get.stringValue)
-    permissionInt <- ZIO.fromOption {
-      try {
-        (Some(permission.toInt))
-      } catch {
-        case e: NumberFormatException => None
-      }
-    }
+    form <- request.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
+    target <- ZIO.fromTry(Try(form.get("target").get.stringValue.get)).orElseFail(MissingInput("target"))
+    permission <- ZIO.fromTry(Try(form.get("permission").get.stringValue.get)).orElseFail(MissingInput("permission"))
+    permissionInt <- ZIO
+      .fromTry(Try(permission.toInt))
+      .orElseFail(InputValueInvalid("permission", "unable to parse to integer"))
     p <- UserRepository.addPermission(Permission(UUID.randomUUID(), target, permissionInt))
   } yield p
 
   override def deleteEffect(id: String) = for {
-    uuid <- ZIO.fromOption(try {
-      Some(UUID.fromString(id))
-    } catch {
-      case e: IllegalArgumentException => None
-    })
+    uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
     _ <- UserRepository.deletePermission(uuid)
   } yield ()
 

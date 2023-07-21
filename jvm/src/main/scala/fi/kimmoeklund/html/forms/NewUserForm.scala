@@ -15,13 +15,6 @@ case class NewUserForm(
 ):
   private def copy: Unit = ()
 
-enum NewUserFormErrors extends ErrorCode:
-  case NameMissing
-  case OrganizationIdMissing
-  case OrganizationIdInvalid
-  case OrganizationNotFound
-  case RoleIdsInvalid
-
 object NewUserForm:
   def apply(
       name: String,
@@ -38,20 +31,22 @@ object NewUserForm:
       password: Option[FormField],
       passwordConfirmation: Option[FormField]
   ): Validation[ErrorCode, NewUserForm] =
-    import NewUserFormErrors.*
+    import fi.kimmoeklund.domain.FormError.*
 
     val orgIdValidation = for {
-      uuidStr <- Validation.fromOptionWith(OrganizationIdMissing)(
+      uuidStr <- Validation.fromOptionWith(MissingInput("organization"))(
         organizationId.flatMap(_.stringValue)
       )
-      uuid <- Validation.fromTry(Try(UUID.fromString(uuidStr))).mapError(_ => OrganizationIdInvalid)
+      uuid <- Validation
+        .fromTry(Try(UUID.fromString(uuidStr)))
+        .mapError(_ => InputValueInvalid("organization", "unable to parse as UUID"))
     } yield uuid
 
     val roleIdsValidation = Validation
       .fromTry(
         Try(if roleIds.isEmpty then Set() else roleIds.get.stringValue.get.split(",").map(UUID.fromString).toSet)
       )
-      .mapError(_ => RoleIdsInvalid)
+      .mapError(_ => InputValueInvalid("organization", "unable to parse as UUID"))
 
     val newPassword = NewPasswordCredentials.fromOptions(
       userName.flatMap(_.stringValue),
@@ -59,11 +54,10 @@ object NewUserForm:
       passwordConfirmation.flatMap(_.stringValue)
     )
 
-    val nameValidation = Validation.fromOptionWith(NameMissing)(name.flatMap(_.stringValue))
+    val nameValidation = Validation.fromOptionWith(MissingInput("name"))(name.flatMap(_.stringValue))
     Validation.validateWith(
       nameValidation,
       orgIdValidation,
       roleIdsValidation,
       newPassword
     )(this.apply)
-

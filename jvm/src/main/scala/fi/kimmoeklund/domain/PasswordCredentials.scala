@@ -16,22 +16,16 @@ object NewPasswordCredentials:
       userName: Option[String],
       password: Option[String],
       passwordConfirmation: Option[String]
-  ): Validation[PasswordError, NewPasswordCredentials] =
-    import PasswordError.*
+  ): Validation[FormError, NewPasswordCredentials] =
+    import FormError.*
     import Validation.*
     val passwordValidation = for {
       pdws <- validate(
-        fromOption(password).mapError(_ => PasswordMissing),
-        fromOption(passwordConfirmation).mapError(_ => PasswordConfirmationMissing)
+        fromOption(password).mapError(_ => MissingInput("password")),
+        fromOption(passwordConfirmation).mapError(_ => MissingInput("password-confirmation"))
       )
       pwdMatch <- if (pdws._1 == pdws._2) succeed(pdws._1) else fail(PasswordsDoNotMatch)
     } yield pwdMatch
-    validateWith(fromOption(userName).mapError(_ => UserNameMissing), passwordValidation)(
+    validateWith(fromOption(userName).mapError(_ => MissingInput("username")), passwordValidation)(
       this.apply
     )
-
-enum PasswordError extends ErrorCode:
-  case PasswordMissing
-  case PasswordConfirmationMissing
-  case PasswordsDoNotMatch
-  case UserNameMissing

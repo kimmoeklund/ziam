@@ -1,18 +1,20 @@
 package fi.kimmoeklund.html.pages
 
-import fi.kimmoeklund.domain.Organization
+import fi.kimmoeklund.domain.{ErrorCode, FormError, Organization}
 import fi.kimmoeklund.html.{Effects, Renderer, SimplePage, SiteMap}
 import fi.kimmoeklund.service.UserRepository
 import zio.ZIO
-import zio.http.Request
-import zio.http.{html as _, *}
-import zio.http.html.{option, th, *}
+import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
+import zio.http.{Request, html as _, *}
 
 import java.util.UUID
+import scala.util.Try
 
 object OrganizationsEffects extends Effects[UserRepository, Organization] with Renderer[Organization] {
+
+  import FormError.*
 
   extension (o: Organization) {
     def htmlTableRow: Dom = tr(
@@ -36,21 +38,22 @@ object OrganizationsEffects extends Effects[UserRepository, Organization] with R
       )
   }
 
-  override def getEffect: ZIO[UserRepository, Throwable, List[Organization]] =
+  override def getEffect: ZIO[UserRepository, ErrorCode, List[Organization]] =
     for {
       organizations <- UserRepository.getOrganizations()
     } yield organizations
 
-  override def postEffect(req: Request): ZIO[UserRepository, Option[Nothing] | Throwable, Organization] = for {
-    form <- req.body.asURLEncodedForm
-    name <- ZIO.fromOption(form.get("name").get.stringValue)
-    o <- UserRepository.addOrganization(Organization(UUID.randomUUID(), name))
-  } yield o
+  override def postEffect(req: Request): ZIO[UserRepository, ErrorCode, Organization] =
+    for {
+      form <- req.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
+      name <- ZIO.fromTry(Try(form.get("name").get.stringValue.get)).orElseFail(MissingInput("name"))
+      o <- UserRepository.addOrganization(Organization(UUID.randomUUID(), name))
+    } yield o
 
-  override def deleteEffect(id: String): ZIO[UserRepository, Option[Nothing] | Throwable, Unit] = for {
-      uuid <- ZIO.attempt(UUID.fromString(id))
-      _ <- UserRepository.deleteOrganization(uuid)
-    } yield ()
+  override def deleteEffect(id: String): ZIO[UserRepository, ErrorCode, Unit] = for {
+    uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
+    _ <- UserRepository.deleteOrganization(uuid)
+  } yield ()
 
   override def htmlTable(args: List[Organization]): Html = {
     table(
@@ -58,7 +61,7 @@ object OrganizationsEffects extends Effects[UserRepository, Organization] with R
       tHead(
         tr(
           th("Organization"),
-          th("ID"),
+          th("ID")
         )
       ),
       tBody(id := "organizations-table", args.map(htmlTableRow))
@@ -67,13 +70,14 @@ object OrganizationsEffects extends Effects[UserRepository, Organization] with R
         idAttr := "add-organization",
         PartialAttribute("hx-post") := "/organizations",
         PartialAttribute("hx-swap") := "none",
-        div(classAttr := "mb-3" :: Nil,
+        div(
+          classAttr := "mb-3" :: Nil,
           label(
             "Name",
             forAttr := "name-field",
-            classAttr := "form-label" :: Nil,
+            classAttr := "form-label" :: Nil
           ),
-          input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text"),
+          input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text")
         ),
         button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
       ) ++
@@ -85,4 +89,9 @@ object OrganizationsEffects extends Effects[UserRepository, Organization] with R
   override def optionsList(args: List[Organization]): Html = args.map(o => option(o.name, valueAttr := o.id.toString))
 }
 
-object OrganizationsPage extends SimplePage(Root / "organizations", SiteMap.tabs.setActiveTab(SiteMap.organizationsTab), OrganizationsEffects)
+object OrganizationsPage
+    extends SimplePage(
+      Root / "organizations",
+      SiteMap.tabs.setActiveTab(SiteMap.organizationsTab),
+      OrganizationsEffects
+    )

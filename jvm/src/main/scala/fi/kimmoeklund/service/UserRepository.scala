@@ -7,93 +7,93 @@ import java.util.UUID
 import fi.kimmoeklund.domain.ErrorCode
 
 trait UserRepository:
-  def checkUserPassword(userName: String, password: String): Task[Option[User]]
+  def checkUserPassword(userName: String, password: String): IO[ErrorCode, Option[User]]
 
   def addUser(user: NewPasswordUser): IO[ErrorCode, User]
 
-  def addRole(role: Role): Task[Role]
+  def addRole(role: Role): IO[ErrorCode, Role]
 
-  def addOrganization(org: Organization): Task[Organization]
+  def addOrganization(org: Organization): IO[ErrorCode, Organization]
 
-  def addPermission(permission: Permission): Task[Permission]
-  
-  def updateUserRoles: Task[Option[User]]
-  
-  def effectivePermissionsForUser(id: String): Task[Option[Seq[Permission]]]
+  def addPermission(permission: Permission): IO[ErrorCode, Permission]
 
-  def getUsers: Task[List[User]]
+  def updateUserRoles: IO[ErrorCode, Option[User]]
 
-  def getRoles: Task[List[Role]]
+  def effectivePermissionsForUser(id: String): IO[ErrorCode, Option[Seq[Permission]]]
+
+  def getUsers: IO[ErrorCode, List[User]]
+
+  def getRoles: IO[ErrorCode, List[Role]]
 
   def getRolesByIds(ids: Seq[UUID]): IO[ErrorCode, List[Role]]
 
-  def getOrganizations: Task[List[Organization]]
+  def getOrganizations: IO[ErrorCode, List[Organization]]
 
   def getOrganizationById(id: UUID): IO[ErrorCode, Organization]
 
-  def getPermissions: Task[List[Permission]]
+  def getPermissions: IO[ErrorCode, List[Permission]]
 
-  def getPermissionsById(ids: Seq[UUID]): Task[List[Permission]]
+  def getPermissionsById(ids: Seq[UUID]): IO[ErrorCode, List[Permission]]
 
-  def deletePermission(id: UUID): Task[Unit]
+  def deletePermission(id: UUID): IO[ErrorCode, Unit]
 
-  def deleteOrganization(id: UUID): Task[Unit]
+  def deleteOrganization(id: UUID): IO[ErrorCode, Unit]
 
-  def deleteRole(id: UUID): Task[Unit]
+  def deleteRole(id: UUID): IO[ErrorCode, Unit]
 
-  def deleteUser(id: UUID): Task[Unit]
+  def deleteUser(id: UUID): IO[ErrorCode, Unit]
 
 object UserRepository:
-  def checkUserPassword(userName: String, password: String): ZIO[UserRepository, Throwable, Option[User]] =
+  def checkUserPassword(userName: String, password: String): ZIO[UserRepository, ErrorCode, Option[User]] =
     ZIO.serviceWithZIO[UserRepository](_.checkUserPassword(userName, password))
 
-  def addOrganization(org: Organization): ZIO[UserRepository, Throwable, Organization] =
+  def addOrganization(org: Organization): ZIO[UserRepository, ErrorCode, Organization] =
     ZIO.serviceWithZIO[UserRepository](_.addOrganization(org))
 
   def addUser(user: NewPasswordUser): ZIO[UserRepository, ErrorCode, User] =
     ZIO.serviceWithZIO[UserRepository](_.addUser(user))
 
-  def addRole(role: Role): ZIO[UserRepository, Throwable, Role] =
+  def addRole(role: Role): ZIO[UserRepository, ErrorCode, Role] =
     ZIO.serviceWithZIO[UserRepository](_.addRole(role))
 
-  def addPermission(permission: Permission): ZIO[UserRepository, Throwable, Permission] =
+  def addPermission(permission: Permission): ZIO[UserRepository, ErrorCode, Permission] =
     ZIO.serviceWithZIO[UserRepository](_.addPermission(permission))
 
-  def updateUserRoles(): ZIO[UserRepository, Throwable, Option[User]] =
+  def updateUserRoles(): ZIO[UserRepository, ErrorCode, Option[User]] =
     ZIO.serviceWithZIO[UserRepository](_.updateUserRoles)
 
-  def effectivePermissionsForUser(id: String): ZIO[UserRepository, Throwable, Option[Seq[Permission]]] = 
+  def effectivePermissionsForUser(id: String): ZIO[UserRepository, ErrorCode, Option[Seq[Permission]]] =
     ZIO.serviceWithZIO[UserRepository](_.effectivePermissionsForUser(id))
 
-  def getUsers(): ZIO[UserRepository, Throwable, List[User]] = 
+  def getUsers(): ZIO[UserRepository, ErrorCode, List[User]] =
     ZIO.serviceWithZIO[UserRepository](_.getUsers)
 
-  def getRoles(): ZIO[UserRepository, Throwable, List[Role]] =
+  def getRoles(): ZIO[UserRepository, ErrorCode, List[Role]] =
     ZIO.serviceWithZIO[UserRepository](_.getRoles)
 
   def getRolesByIds(ids: Seq[UUID]): ZIO[UserRepository, ErrorCode, List[Role]] =
     ZIO.serviceWithZIO[UserRepository](_.getRolesByIds(ids))
 
-  def getPermissions(): ZIO[UserRepository, Throwable, List[Permission]] =
+  def getPermissions(): ZIO[UserRepository, ErrorCode, List[Permission]] =
     ZIO.serviceWithZIO[UserRepository](_.getPermissions)
 
-  def getOrganizations(): ZIO[UserRepository, Throwable, List[Organization]] =
+  def getOrganizations(): ZIO[UserRepository, ErrorCode, List[Organization]] =
     ZIO.serviceWithZIO[UserRepository](_.getOrganizations)
 
   def getOrganizationById(id: UUID): ZIO[UserRepository, ErrorCode, Organization] =
     ZIO.serviceWithZIO[UserRepository](_.getOrganizationById(id))
 
-  def getPermissionsById(ids: Seq[UUID]): ZIO[UserRepository, Throwable, List[Permission]] =
+  def getPermissionsById(ids: Seq[UUID]): ZIO[UserRepository, ErrorCode, List[Permission]] =
     ZIO.serviceWithZIO[UserRepository](_.getPermissionsById(ids))
 
-  def deletePermission(id: UUID): ZIO[UserRepository, Throwable, Unit] =
+  def deletePermission(id: UUID): ZIO[UserRepository, ErrorCode, Unit] =
     ZIO.serviceWithZIO[UserRepository](_.deletePermission(id))
 
-  def deleteOrganization(id: UUID): ZIO[UserRepository, Throwable, Unit] =
+  def deleteOrganization(id: UUID): ZIO[UserRepository, ErrorCode, Unit] =
     ZIO.serviceWithZIO[UserRepository](_.deleteOrganization(id))
 
-  def deleteRole(id: UUID): ZIO[UserRepository, Throwable, Unit] =
+  def deleteRole(id: UUID): ZIO[UserRepository, ErrorCode, Unit] =
     ZIO.serviceWithZIO[UserRepository](_.deleteRole(id))
 
-  def deleteUser(id: UUID): ZIO[UserRepository, Throwable, Unit] =
+  def deleteUser(id: UUID): ZIO[UserRepository, ErrorCode, Unit] =
     ZIO.serviceWithZIO[UserRepository](_.deleteUser(id))
