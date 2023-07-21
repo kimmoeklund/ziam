@@ -1,6 +1,5 @@
 package fi.kimmoeklund.infra
 
-import fi.kimmoeklund.domain
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.service.UserRepository
 import io.getquill.*
@@ -10,6 +9,9 @@ import zio.*
 
 import java.util.UUID
 import javax.sql.DataSource
+import java.sql.SQLException
+import org.postgresql.util.PSQLException
+import io.getquill.ast.SetOperator.isEmpty
 
 case class Members(id: UUID, organization: UUID, name: String)
 case class Memberships(memberId: UUID, parent: UUID)
@@ -114,13 +116,13 @@ final class UserRepositoryLive(
       )
     }.map(_ => org)
 
-  override def addUser(user: NewPasswordUser): Task[User] = {
+  override def addUser(user: NewPasswordUser): IO[ErrorCode, User] = {
     val members = toMember(user)
     val creds = PasswordCredentials(
       user.id,
       user.credentials.userName,
       user.credentials.password
-    ) // user.credentials.into[PasswordCredentials].transform(Field.const(_.memberId, user.id))
+    )
     transaction {
       for {
         _ <- run(query[Members].insertValue(lift(members)))
@@ -137,8 +139,17 @@ final class UserRepositoryLive(
         user.roles,
         Seq(Login(creds.userName, LoginType.PasswordCredentials))
       ))
-    }
+    }.tapError({
+      case e: SQLException => ZIO.logError(s"SQLException : ${e.getMessage()} : error code: ${e.getErrorCode()}, : sqlState: ${e.getSQLState()}")
+      case t: Throwable => ZIO.logError(s"Throwable : ${t.getMessage()} : class: ${t.getClass().toString()}")
+    })
+      .mapError(
+      {
+        case e: PSQLException if e.getSQLState() == "23505" && e.getMessage().contains("user_name") => GeneralErrors.UniqueKeyViolation("userName") 
+        case t: Throwable => GeneralErrors.Exception
+      })
   }
+
   override def addRole(role: Role): Task[Role] =
     val newRole = Roles(role.id, role.name)
     transaction {
@@ -225,16 +236,19 @@ final class UserRepositoryLive(
     )
   }
 
-  override def getRolesByIds(ids: Seq[UUID]): Task[List[Role]] = run {
+  override def getRolesByIds(ids: Seq[UUID]): IO[ErrorCode, List[Role]] = run {
     for {
       roles <- query[Roles].filter(r => liftQuery(ids).contains(r.id))
       pg <- query[PermissionGrants].leftJoin(pg => roles.id == pg.roleId)
       p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
     } yield (roles, pg, p)
-  }.fold(
-    _ => List(),
+  }.map(
     list => mapRoles(list)
-  )
+    ).filterOrElseWith(roles => roles.size == ids.size)(roles => ZIO.fail(GeneralErrors.EntityNotFound(ids.diff(roles.map(_.id)).mkString(","))))
+  .mapError({
+    case e: SQLException => GeneralErrors.Exception
+    case e: GeneralErrors => e
+  })
 
   override def getOrganizations: Task[List[Organization]] =
     run {
@@ -249,13 +263,12 @@ final class UserRepositoryLive(
       query[Members].filter(o => o.id == lift(id)).delete
     }.map(_ => ())
 
-  override def getOrganizationById(id: UUID): Task[Option[Organization]] =
+  override def getOrganizationById(id: UUID): IO[ErrorCode, Organization] =
     run {
       query[Members].filter(o => o.id == lift(id) && o.id == o.organization)
-    }.fold(
-      _ => Option.empty,
-      list => list.map(m => Organization(m.id, m.name)).headOption
-    )
+    }.mapError(e => GeneralErrors.Exception)
+      .filterOrFail(!_.isEmpty)(GeneralErrors.EntityNotFound(id.toString))
+      .map(list => list.map(m => Organization(m.id, m.name)).head)
 
   override def deleteUser(id: UUID): Task[Unit] = run {
     query[Members].filter(m => m.id == lift(id)).delete

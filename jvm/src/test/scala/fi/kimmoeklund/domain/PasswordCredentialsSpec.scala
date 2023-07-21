@@ -1,6 +1,6 @@
 package fi.kimmoeklund.domain
 
-import fi.kimmoeklund.domain.PasswordError.{PasswordConfirmationMissing, PasswordMissing, UserIdMissing, UserNameMissing}
+import fi.kimmoeklund.domain.PasswordError.{PasswordConfirmationMissing, PasswordMissing, UserNameMissing}
 import zio.test.*
 
 import java.util.UUID

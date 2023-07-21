@@ -113,7 +113,7 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
 
   override def postResult(item: User): Html = item.usersTableSwap
 
-  override def postEffect(req: Request): ZIO[UserRepository, Option[Nothing] | ErrorCode | Throwable, User] =
+  override def postEffect(req: Request): ZIO[UserRepository, ErrorCode | Throwable, User] =
     val userId = UUID.randomUUID()
     for {
       form <- req.body.asURLEncodedForm
@@ -129,10 +129,9 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
         .toZIO
       orgAndRoles <- UserRepository
         .getOrganizationById(newUserForm.organizationId)
-        .zipPar(UserRepository.getRolesByIds(newUserForm.roleIds.toSeq))
-      organization <- Validation.fromOptionWith(NewUserFormErrors.OrganizationNotFound)(orgAndRoles._1).toZIO
+        .validatePar(UserRepository.getRolesByIds(newUserForm.roleIds.toSeq))
       user <- UserRepository.addUser(
-        NewPasswordUser(userId, newUserForm.name, organization, newUserForm.credentials, orgAndRoles._2)
+        NewPasswordUser(userId, newUserForm.name, orgAndRoles._1, newUserForm.credentials, orgAndRoles._2)
       )
     } yield (user)
 
@@ -145,7 +144,6 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
 
   def getEffect = for {
     users <- UserRepository.getUsers()
-    _ <- ZIO.logInfo(users.map(u => u.toString).mkString(","))
   } yield users
 
 object UsersPage extends SimplePage(Root / "users", SiteMap.tabs.setActiveTab(SiteMap.usersTab), UsersEffects)

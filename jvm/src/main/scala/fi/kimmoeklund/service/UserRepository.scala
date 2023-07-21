@@ -4,11 +4,12 @@ import fi.kimmoeklund.domain.{NewPasswordUser, Organization, PasswordCredentials
 import zio.*
 
 import java.util.UUID
+import fi.kimmoeklund.domain.ErrorCode
 
 trait UserRepository:
   def checkUserPassword(userName: String, password: String): Task[Option[User]]
 
-  def addUser(user: NewPasswordUser): Task[User]
+  def addUser(user: NewPasswordUser): IO[ErrorCode, User]
 
   def addRole(role: Role): Task[Role]
 
@@ -24,11 +25,11 @@ trait UserRepository:
 
   def getRoles: Task[List[Role]]
 
-  def getRolesByIds(ids: Seq[UUID]): Task[List[Role]]
+  def getRolesByIds(ids: Seq[UUID]): IO[ErrorCode, List[Role]]
 
   def getOrganizations: Task[List[Organization]]
 
-  def getOrganizationById(id: UUID): Task[Option[Organization]]
+  def getOrganizationById(id: UUID): IO[ErrorCode, Organization]
 
   def getPermissions: Task[List[Permission]]
 
@@ -49,7 +50,7 @@ object UserRepository:
   def addOrganization(org: Organization): ZIO[UserRepository, Throwable, Organization] =
     ZIO.serviceWithZIO[UserRepository](_.addOrganization(org))
 
-  def addUser(user: NewPasswordUser): ZIO[UserRepository, Throwable, User] =
+  def addUser(user: NewPasswordUser): ZIO[UserRepository, ErrorCode, User] =
     ZIO.serviceWithZIO[UserRepository](_.addUser(user))
 
   def addRole(role: Role): ZIO[UserRepository, Throwable, Role] =
@@ -70,7 +71,7 @@ object UserRepository:
   def getRoles(): ZIO[UserRepository, Throwable, List[Role]] =
     ZIO.serviceWithZIO[UserRepository](_.getRoles)
 
-  def getRolesByIds(ids: Seq[UUID]): ZIO[UserRepository, Throwable, List[Role]] =
+  def getRolesByIds(ids: Seq[UUID]): ZIO[UserRepository, ErrorCode, List[Role]] =
     ZIO.serviceWithZIO[UserRepository](_.getRolesByIds(ids))
 
   def getPermissions(): ZIO[UserRepository, Throwable, List[Permission]] =
@@ -79,7 +80,7 @@ object UserRepository:
   def getOrganizations(): ZIO[UserRepository, Throwable, List[Organization]] =
     ZIO.serviceWithZIO[UserRepository](_.getOrganizations)
 
-  def getOrganizationById(id: UUID): ZIO[UserRepository, Throwable, Option[Organization]] =
+  def getOrganizationById(id: UUID): ZIO[UserRepository, ErrorCode, Organization] =
     ZIO.serviceWithZIO[UserRepository](_.getOrganizationById(id))
 
   def getPermissionsById(ids: Seq[UUID]): ZIO[UserRepository, Throwable, List[Permission]] =

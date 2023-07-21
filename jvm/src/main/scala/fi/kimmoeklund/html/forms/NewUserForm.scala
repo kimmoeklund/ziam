@@ -67,9 +67,3 @@ object NewUserForm:
       newPassword
     )(this.apply)
 
-//    NewUserForm(
-//      Validation.succeed(name),
-//      Validation.succeed(organizationId),
-//      Validation.succeed(roleIds),
-//      Validation.succeed(credentials)
-//    )
