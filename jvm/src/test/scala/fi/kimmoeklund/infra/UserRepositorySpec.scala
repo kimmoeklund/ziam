@@ -37,7 +37,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
     Gen.stringBounded(5, 100)(Gen.unicodeChar.filter(c => c != 0x00.toChar && !c.isControl && !c.isWhitespace))
   val asciiString = Gen.stringBounded(3, 12)(Gen.alphaNumericChar)
 
-  def fetchUsers: ZIO[ZState[TestScenario] & UserRepository, Throwable, List[
+  def fetchUsers: ZIO[ZState[TestScenario] & UserRepository, ErrorCode, List[
     Spec[Any, Nothing]
   ]] =
     val users = for {

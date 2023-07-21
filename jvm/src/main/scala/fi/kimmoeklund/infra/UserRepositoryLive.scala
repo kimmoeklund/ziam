@@ -3,15 +3,15 @@ package fi.kimmoeklund.infra
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.service.UserRepository
 import io.getquill.*
+import io.getquill.ast.SetOperator.isEmpty
 import io.getquill.jdbczio.Quill
 import io.github.arainko.ducktape.*
+import org.postgresql.util.PSQLException
 import zio.*
 
+import java.sql.SQLException
 import java.util.UUID
 import javax.sql.DataSource
-import java.sql.SQLException
-import org.postgresql.util.PSQLException
-import io.getquill.ast.SetOperator.isEmpty
 
 case class Members(id: UUID, organization: UUID, name: String)
 case class Memberships(memberId: UUID, parent: UUID)
@@ -79,7 +79,7 @@ final class UserRepositoryLive(
   override def checkUserPassword(
       userName: String,
       password: String
-  ): Task[Option[User]] = {
+  ): IO[ErrorCode, Option[User]] = {
     run {
       for {
         creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName) && p.password == lift(password))
@@ -90,6 +90,7 @@ final class UserRepositoryLive(
         pg <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
         p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
       } yield (m, o, r, p, creds)
+
     }.fold(
       _ => Option.empty,
       list =>
@@ -98,12 +99,12 @@ final class UserRepositoryLive(
     )
   }
 
-  override def updateUserRoles: Task[Option[User]] = ???
+  override def updateUserRoles: IO[ErrorCode, Option[User]] = ???
   override def effectivePermissionsForUser(
       id: String
-  ): Task[Option[Seq[Permission]]] = ???
+  ): IO[ErrorCode, Option[Seq[Permission]]] = ???
 
-  override def addOrganization(org: Organization): Task[Organization] =
+  override def addOrganization(org: Organization): IO[ErrorCode, Organization] =
     run {
       query[Members].insertValue(
         lift(
@@ -114,7 +115,7 @@ final class UserRepositoryLive(
           )
         )
       )
-    }.map(_ => org)
+    }.mapBoth(_ => GeneralErrors.Exception, _ => org)
 
   override def addUser(user: NewPasswordUser): IO[ErrorCode, User] = {
     val members = toMember(user)
@@ -140,17 +141,19 @@ final class UserRepositoryLive(
         Seq(Login(creds.userName, LoginType.PasswordCredentials))
       ))
     }.tapError({
-      case e: SQLException => ZIO.logError(s"SQLException : ${e.getMessage()} : error code: ${e.getErrorCode()}, : sqlState: ${e.getSQLState()}")
+      case e: SQLException =>
+        ZIO.logError(
+          s"SQLException : ${e.getMessage()} : error code: ${e.getErrorCode()}, : sqlState: ${e.getSQLState()}"
+        )
       case t: Throwable => ZIO.logError(s"Throwable : ${t.getMessage()} : class: ${t.getClass().toString()}")
+    }).mapError({
+      case e: PSQLException if e.getSQLState() == "23505" && e.getMessage().contains("user_name") =>
+        GeneralErrors.UniqueKeyViolation("userName")
+      case t: Throwable => GeneralErrors.Exception
     })
-      .mapError(
-      {
-        case e: PSQLException if e.getSQLState() == "23505" && e.getMessage().contains("user_name") => GeneralErrors.UniqueKeyViolation("userName") 
-        case t: Throwable => GeneralErrors.Exception
-      })
   }
 
-  override def addRole(role: Role): Task[Role] =
+  override def addRole(role: Role): IO[ErrorCode, Role] =
     val newRole = Roles(role.id, role.name)
     transaction {
       for {
@@ -165,10 +168,10 @@ final class UserRepositoryLive(
             )
           }
       } yield (newRole)
-    }.map(r => r.into[Role].transform(Field.const(_.permissions, role.permissions)))
+    }.mapBoth(_ => GeneralErrors.Exception, r => r.into[Role].transform(Field.const(_.permissions, role.permissions)))
 
   override def addPermission(permission: Permission) =
-    for {
+    (for {
       _ <- run(
         query[Permissions].insertValue(
           lift(
@@ -180,9 +183,9 @@ final class UserRepositoryLive(
           )
         )
       )
-    } yield (permission)
+    } yield (permission)).mapBoth(_ => GeneralErrors.Exception, p => p)
 
-  override def getUsers: Task[List[User]] = run {
+  override def getUsers: IO[ErrorCode, List[User]] = run {
     for {
       m <- query[Members].filter(m => m.organization != m.id)
       o <- query[Members].join(o => o.organization == m.organization)
@@ -197,7 +200,7 @@ final class UserRepositoryLive(
       _ => List(),
       list => mapUsers(list)
     )
-  override def getPermissions: Task[List[Permission]] =
+  override def getPermissions: IO[ErrorCode, List[Permission]] =
     val users = run {
       query[Permissions]
     }.fold(
@@ -206,24 +209,29 @@ final class UserRepositoryLive(
     )
     users
 
-  override def getPermissionsById(ids: Seq[UUID]): Task[List[Permission]] = {
-    run { quote { query[Permissions].filter(p => liftQuery(ids).contains(p.id)) } }.map(l =>
-      l.map(p => p.to[Permission])
+  override def getPermissionsById(ids: Seq[UUID]): IO[ErrorCode, List[Permission]] = run {
+    quote { query[Permissions].filter(p => liftQuery(ids).contains(p.id)) }
+  }.map(l => l.map(p => p.to[Permission]))
+    .filterOrElseWith(permissions => permissions.size == ids.size)(permissions =>
+      ZIO.fail(GeneralErrors.EntityNotFound(ids.diff(permissions.map(_.id)).mkString(",")))
     )
-  }
+    .mapError({
+      case _: SQLException  => GeneralErrors.Exception
+      case e: GeneralErrors => e
+    })
 
-  override def deletePermission(id: UUID): Task[Unit] = {
+  override def deletePermission(id: UUID): IO[ErrorCode, Unit] = {
     run {
       query[Permissions].filter(p => p.id == lift(id)).delete
-    }.map(_ => ())
+    }.mapBoth(_ => GeneralErrors.Exception, _ => ())
   }
 
-  override def deleteRole(id: UUID): Task[Unit] =
+  override def deleteRole(id: UUID): IO[ErrorCode, Unit] =
     run {
       query[Roles].filter(r => r.id == lift(id)).delete
-    }.map(_ => ())
+    }.mapBoth(_ => GeneralErrors.Exception, _ => ())
 
-  override def getRoles: Task[List[Role]] = {
+  override def getRoles: IO[ErrorCode, List[Role]] = {
     run {
       for {
         roles <- query[Roles]
@@ -242,15 +250,16 @@ final class UserRepositoryLive(
       pg <- query[PermissionGrants].leftJoin(pg => roles.id == pg.roleId)
       p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
     } yield (roles, pg, p)
-  }.map(
-    list => mapRoles(list)
-    ).filterOrElseWith(roles => roles.size == ids.size)(roles => ZIO.fail(GeneralErrors.EntityNotFound(ids.diff(roles.map(_.id)).mkString(","))))
-  .mapError({
-    case e: SQLException => GeneralErrors.Exception
-    case e: GeneralErrors => e
-  })
+  }.map(list => mapRoles(list))
+    .filterOrElseWith(roles => roles.size == ids.size)(roles =>
+      ZIO.fail(GeneralErrors.EntityNotFound(ids.diff(roles.map(_.id)).mkString(",")))
+    )
+    .mapError({
+      case _: SQLException  => GeneralErrors.Exception
+      case e: GeneralErrors => e
+    })
 
-  override def getOrganizations: Task[List[Organization]] =
+  override def getOrganizations: IO[ErrorCode, List[Organization]] =
     run {
       query[Members].filter(m => m.id == m.organization)
     }.fold(
@@ -258,21 +267,21 @@ final class UserRepositoryLive(
       list => list.map(m => Organization(m.id, m.name))
     )
 
-  override def deleteOrganization(id: UUID): Task[Unit] =
+  override def deleteOrganization(id: UUID): IO[ErrorCode, Unit] =
     run {
       query[Members].filter(o => o.id == lift(id)).delete
-    }.map(_ => ())
+    }.mapBoth(_ => GeneralErrors.Exception, _ => ())
 
   override def getOrganizationById(id: UUID): IO[ErrorCode, Organization] =
     run {
       query[Members].filter(o => o.id == lift(id) && o.id == o.organization)
     }.mapError(e => GeneralErrors.Exception)
-      .filterOrFail(!_.isEmpty)(GeneralErrors.EntityNotFound(id.toString))
+      .filterOrFail(_.nonEmpty)(GeneralErrors.EntityNotFound(id.toString))
       .map(list => list.map(m => Organization(m.id, m.name)).head)
 
-  override def deleteUser(id: UUID): Task[Unit] = run {
+  override def deleteUser(id: UUID): IO[ErrorCode, Unit] = run {
     query[Members].filter(m => m.id == lift(id)).delete
-  }.map(_ => ())
+  }.mapBoth(_ => GeneralErrors.Exception, _ => ())
 
 end UserRepositoryLive
 

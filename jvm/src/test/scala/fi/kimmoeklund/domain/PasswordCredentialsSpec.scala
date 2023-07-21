@@ -1,6 +1,6 @@
 package fi.kimmoeklund.domain
 
-import fi.kimmoeklund.domain.PasswordError.{PasswordConfirmationMissing, PasswordMissing, UserNameMissing}
+import fi.kimmoeklund.domain.FormError.*
 import zio.test.*
 
 import java.util.UUID
@@ -12,9 +12,9 @@ object PasswordCredentialsSpec extends ZIOSpecDefault {
         .fromOptions(None, None, None)
         .fold(
           e => {
-            assertTrue(e.contains(UserNameMissing))
-            assertTrue(e.contains(PasswordMissing))
-            assertTrue(e.contains(PasswordConfirmationMissing))
+            assertTrue(e.contains(MissingInput("username")))
+            assertTrue(e.contains(MissingInput("password")))
+            assertTrue(e.contains(MissingInput("password-confirmation")))
           },
           _ => assertTrue(false)
         )
@@ -24,7 +24,7 @@ object PasswordCredentialsSpec extends ZIOSpecDefault {
         .fromOptions(Some("username"), Some("password"), Some("password2"))
         .fold(
           e => {
-            assertTrue(e.contains(PasswordError.PasswordsDoNotMatch))
+            assertTrue(e.contains(PasswordsDoNotMatch))
           },
           _ => assertTrue(false)
         )

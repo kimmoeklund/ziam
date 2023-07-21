@@ -7,10 +7,10 @@ val zioMockVersion = "1.0.0-RC8"
 ThisBuild / scalaVersion := "3.3.0"
 ThisBuild / organization := "fi.kimmoeklund"
 
-lazy val root = project.in(file(".")).aggregate(ziam.js, ziam.jvm).settings(
-  publish := {}, publishLocal := {})
+lazy val root = project.in(file(".")).aggregate(ziam.js, ziam.jvm).settings(publish := {}, publishLocal := {})
 
-lazy val ziam = crossProject(JSPlatform, JVMPlatform).in(file("."))
+lazy val ziam = crossProject(JSPlatform, JVMPlatform)
+  .in(file("."))
   .jvmSettings(
     libraryDependencies ++= Seq(
       "dev.zio" %% "zio" % zioVersion,
@@ -31,10 +31,10 @@ lazy val ziam = crossProject(JSPlatform, JVMPlatform).in(file("."))
       "dev.zio" %% "zio-test-junit" % zioVersion % Test,
       "dev.zio" %% "zio-mock" % zioMockVersion % Test,
       "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersVersion % Test,
-      "dev.zio" %% "zio-test-magnolia" % zioVersion % Test),
-    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")
+      "dev.zio" %% "zio-test-magnolia" % zioVersion % Test
     ),
-    addCompilerPlugin("com.hmemcpy" %% "zio-clippy" % "0.0.1")
+    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
+    // addCompilerPlugin("com.hmemcpy" %% "zio-clippy" % "0.0.1")
   )
   .jsSettings(
     libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "2.4.0",

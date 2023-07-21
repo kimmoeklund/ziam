@@ -1,15 +1,17 @@
 package fi.kimmoeklund.html.pages
 
+import fi.kimmoeklund.domain.FormError.*
 import fi.kimmoeklund.domain.Role
+import fi.kimmoeklund.html.{Effects, Renderer, SimplePage, SiteMap}
+import fi.kimmoeklund.service.UserRepository
 import zio.*
-import zio.http.{html as _, *}
-import zio.http.html.{option, th, *}
+import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
-import fi.kimmoeklund.html.{Effects, Renderer, SimplePage, SiteMap}
+import zio.http.{html as _, *}
 
 import java.util.UUID
-import fi.kimmoeklund.service.UserRepository
+import scala.util.Try
 
 object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
 
@@ -38,28 +40,36 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
 
   override def getEffect = for {
     roles <- UserRepository.getRoles()
-   } yield roles
+  } yield roles
 
   def postEffect(request: Request) = for {
-    form <- request.body.asURLEncodedForm
-    name <- ZIO.fromOption(form.get("name").get.stringValue)
-    inputUuids <- ZIO.fromOption(form.get("permissions").get.stringValue.map(s => s.split(",").map(uuidStr =>
-      try {
-        Some(UUID.fromString(uuidStr))
-      } catch {
-        case e: IllegalArgumentException => None
-      })))
-    permissions <- UserRepository.getPermissionsById(inputUuids.flatten.toList)
+    form <- request.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
+    name <- ZIO.fromTry(Try(form.get("name").get.stringValue.get)).orElseFail(MissingInput("name"))
+    inputUuids <- ZIO
+      .fromTry(
+        Try(
+          form
+            .get("permissions")
+            .get
+            .stringValue
+            .get
+            .split(",")
+            .map(uuidStr => UUID.fromString(uuidStr))
+        )
+      )
+      .mapError((e: Throwable) =>
+        e match {
+          case _: IllegalArgumentException => InputValueInvalid("permissions", "unable to parse as UUIDs")
+          case _                           => MissingInput("permissions")
+        }
+      )
+    permissions <- UserRepository.getPermissionsById(inputUuids.toList)
     _ <- ZIO.logInfo(inputUuids.mkString(","))
     r <- UserRepository.addRole(Role(UUID.randomUUID(), name, permissions))
   } yield r
 
   override def deleteEffect(id: String) = for {
-    uuid <- ZIO.fromOption(try {
-      Some(UUID.fromString(id))
-    } catch {
-      case e: IllegalArgumentException => None
-    })
+    uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
     _ <- UserRepository.deleteRole(uuid)
   } yield ()
 
@@ -81,26 +91,29 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
         idAttr := "add-role",
         PartialAttribute("hx-post") := "/roles",
         PartialAttribute("hx-swap") := "none",
-        div(classAttr := "mb-3" :: Nil,
+        div(
+          classAttr := "mb-3" :: Nil,
           label(
             "Role name",
             forAttr := "name-field",
-            classAttr := "form-label" :: Nil,
+            classAttr := "form-label" :: Nil
           ),
-          input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text"),
+          input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text")
         ),
-        div(classAttr := "mb-3" :: Nil,
-          label(
-            "Permissions",
-            classAttr := "form-label" :: Nil,
-            forAttr := "permissions-select"),
-          select(idAttr := "permissions-select", classAttr := "form-select" :: Nil, multipleAttr := "multiple",
+        div(
+          classAttr := "mb-3" :: Nil,
+          label("Permissions", classAttr := "form-label" :: Nil, forAttr := "permissions-select"),
+          select(
+            idAttr := "permissions-select",
+            classAttr := "form-select" :: Nil,
+            multipleAttr := "multiple",
             nameAttr := "permissions",
             PartialAttribute("hx-params") := "none",
             PartialAttribute("hx-get") := "/permissions/options",
             PartialAttribute("hx-trigger") := "revealed",
             PartialAttribute("hx-target") := "#permissions-select",
-            PartialAttribute("hx-swap") := "innerHTML"),
+            PartialAttribute("hx-swap") := "innerHTML"
+          )
         ),
         button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
       ) ++

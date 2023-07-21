@@ -1,6 +1,7 @@
 package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.*
+import fi.kimmoeklund.domain.FormError.InputValueInvalid
 import fi.kimmoeklund.html.forms.*
 import fi.kimmoeklund.html.{Effects, Renderer, SimplePage, SiteMap}
 import fi.kimmoeklund.service.UserRepository
@@ -113,10 +114,10 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
 
   override def postResult(item: User): Html = item.usersTableSwap
 
-  override def postEffect(req: Request): ZIO[UserRepository, ErrorCode | Throwable, User] =
+  override def postEffect(req: Request): ZIO[UserRepository, ErrorCode, User] =
     val userId = UUID.randomUUID()
     for {
-      form <- req.body.asURLEncodedForm
+      form <- req.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
       newUserForm <- NewUserForm
         .fromOptions(
           form.get("name"),
@@ -135,8 +136,8 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
       )
     } yield (user)
 
-  override def deleteEffect(id: String): ZIO[UserRepository, Option[Nothing] | Throwable, Unit] = for {
-    uuid <- ZIO.attempt(UUID.fromString(id))
+  override def deleteEffect(id: String): ZIO[UserRepository, ErrorCode, Unit] = for {
+    uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
     _ <- UserRepository.deleteUser(uuid)
   } yield ()
 
