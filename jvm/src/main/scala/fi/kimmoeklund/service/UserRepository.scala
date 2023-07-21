@@ -1,10 +1,9 @@
 package fi.kimmoeklund.service
 
-import fi.kimmoeklund.domain.{NewPasswordUser, Organization, PasswordCredentials, Permission, Role, User, Errors}
+import fi.kimmoeklund.domain.*
 import zio.*
 
 import java.util.UUID
-import fi.kimmoeklund.domain.ErrorCode
 
 trait UserRepository:
   def checkUserPassword(userName: String, password: String): IO[ErrorCode, Option[User]]

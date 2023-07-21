@@ -1,5 +1,6 @@
 package fi.kimmoeklund.infra
 
+import com.outr.scalapass.Argon2PasswordFactory
 import fi.kimmoeklund.domain
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.service.UserRepository
@@ -31,6 +32,11 @@ object UserRepositorySpec extends ZIOSpecDefault:
   val dataSourceLayer = ZLayer(ZIO.service[DataSourceBuilder].map(_.dataSource))
   val postgresLayer =
     Quill.Postgres.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
+  val passwordFactory: ZLayer[Any, Throwable, Argon2PasswordFactory] = ZLayer.scoped {
+    for {
+      factory <- ZIO.attempt(Argon2PasswordFactory())
+    } yield (factory)
+  }
   val repoLayer = UserRepositoryLive.layer
   val testScenario = ZState.initial(TestScenario.create)
   val unicodeString =
@@ -157,6 +163,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
         DataSourceBuilderLive.layer,
         dataSourceLayer,
         postgresLayer,
+        passwordFactory,
         repoLayer,
         testScenario
       ) @@ sequential @@ samples(10) @@ nondeterministic

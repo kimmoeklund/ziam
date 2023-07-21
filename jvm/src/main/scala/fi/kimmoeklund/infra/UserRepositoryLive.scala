@@ -1,5 +1,7 @@
 package fi.kimmoeklund.infra
 
+import com.outr.scalapass.Argon2PasswordFactory
+import de.mkammerer.argon2.Argon2Factory
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.service.UserRepository
 import io.getquill.*
@@ -8,6 +10,7 @@ import io.getquill.jdbczio.Quill
 import io.github.arainko.ducktape.*
 import org.postgresql.util.PSQLException
 import zio.*
+import zio.DefaultServices.live.unsafe
 
 import java.sql.SQLException
 import java.util.UUID
@@ -22,19 +25,17 @@ case class Permissions(id: UUID, target: String, permission: Int)
 case class PasswordCredentials(
     memberId: UUID,
     userName: String,
-    password: String
+    passwordHash: String
 )
 
 object Transformers:
   def toMember(user: NewPasswordUser): Members =
     user.into[Members].transform(Field.computed(_.organization, u => u.organization.id))
-//  def toPasswordCredentialsTable(
-//      creds: domain.NewPasswordCredentials
-//  ): PasswordCredentials = creds.into[PasswordCredentials].transform(Field.renamed(_.memberId, _.userId))
   def toRoles(role: Role): Roles = role.to[Roles]
 
 final class UserRepositoryLive(
-    quill: Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]]
+    quill: Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]],
+    argon2Factory: Argon2PasswordFactory
 ) extends UserRepository:
 
   import Transformers.*
@@ -80,22 +81,30 @@ final class UserRepositoryLive(
       userName: String,
       password: String
   ): IO[ErrorCode, Option[User]] = {
-    run {
+    val combined = run {
       for {
-        creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName) && p.password == lift(password))
-        m <- query[Members].join(m => m.id == creds.memberId)
-        o <- query[Members].join(o => o.id == m.organization)
-        rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
-        r <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
-        pg <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
-        p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
-      } yield (m, o, r, p, creds)
-
-    }.fold(
-      _ => Option.empty,
-      list =>
-        val user = mapUsers(list.map((m, o, r, p, c) => (m, o, r, p, Some(c))))
-        if (user.isEmpty) Option.empty else Some(user.head)
+        creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName))
+      } yield (creds)
+    }.filterOrFail(creds => creds.nonEmpty && argon2Factory.verify(password, creds.head.passwordHash))(
+      GeneralErrors.IncorrectPassword
+    )
+      <&> run {
+        for {
+          creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName))
+          m <- query[Members].join(m => m.id == creds.memberId)
+          o <- query[Members].join(o => o.id == m.organization)
+          rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
+          r <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
+          pg <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
+          p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
+        } yield (m, o, r, p, creds)
+      }.map(list => mapUsers(list.map((m, o, r, p, c) => (m, o, r, p, Some(c)))))
+    combined.mapBoth(
+      {
+        case _: SQLException  => GeneralErrors.Exception
+        case e: GeneralErrors => e
+      },
+      results => results._2.headOption
     )
   }
 
@@ -122,7 +131,7 @@ final class UserRepositoryLive(
     val creds = PasswordCredentials(
       user.id,
       user.credentials.userName,
-      user.credentials.password
+      argon2Factory.hash(user.credentials.password)
     )
     transaction {
       for {
@@ -286,12 +295,15 @@ final class UserRepositoryLive(
 end UserRepositoryLive
 
 object UserRepositoryLive:
-  def layer: URLayer[Quill.Postgres[
-    CompositeNamingStrategy2[SnakeCase.type, Escape.type]
-  ], UserRepository] = ZLayer {
+  def layer: ZLayer[
+    Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]] & Argon2PasswordFactory,
+    Nothing,
+    UserRepository
+  ] = ZLayer {
     for {
       quill <- ZIO.service[Quill.Postgres[
         CompositeNamingStrategy2[SnakeCase.type, Escape.type]
       ]]
-    } yield UserRepositoryLive(quill)
+      argon2Factory <- ZIO.service[Argon2PasswordFactory]
+    } yield UserRepositoryLive(quill, argon2Factory)
   }
