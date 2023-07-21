@@ -8,6 +8,7 @@ enum GeneralErrors extends ErrorCode {
   case Exception
   case EntityNotFound[A](id: String)
   case UniqueKeyViolation(details: String)
+  case IncorrectPassword
 }
 
 enum FormError extends ErrorCode {
