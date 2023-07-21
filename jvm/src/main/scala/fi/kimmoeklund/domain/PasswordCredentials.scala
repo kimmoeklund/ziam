@@ -34,5 +34,4 @@ enum PasswordError extends ErrorCode:
   case PasswordMissing
   case PasswordConfirmationMissing
   case PasswordsDoNotMatch
-  case UserIdMissing
   case UserNameMissing

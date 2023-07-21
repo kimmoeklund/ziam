@@ -68,12 +68,13 @@ case class SimplePage[R,T](path: Path, menu: Menu, functions: Effects[R,T] & Ren
     },
       (result: List[T]) => ZIO.succeed(Response.html(htmlValue(result))))
 
-    case req @ Method.POST -> this.path => functions.postEffect(req).foldZIO(
+      case req @ Method.POST -> this.path => functions.postEffect(req).foldCauseZIO((error: Cause[Option[Nothing] | ErrorCode | Throwable]) => { 
+      error match
       {
-        case e: ErrorCode => ZIO.succeed(Response.text(e.toString).withStatus(Status.BadRequest))
-        case t: Throwable => ZIO.succeed(Response.text(t.getMessage).withStatus(Status.InternalServerError))
-        case _ => ZIO.succeed(Response.text("error not yet available").withStatus(Status.BadRequest))
-      },
+        case c: Cause[_] => ZIO.succeed(Response.text(s"errors: ${c.failures.map(e => e.toString).mkString("\n")}\ndefects: ${c.defects.map(d => d.getMessage()).mkString("\n")}").withStatus(Status.BadRequest))
+        case _ => ZIO.succeed(Response.text("error not yet available").withStatus(Status.InternalServerError))
+      }
+    },
       p => ZIO.succeed(htmlSnippet(functions.postResult(p)).addHeader("HX-Trigger-After-Swap", "resetAndFocusForm")))
 
     case Method.DELETE -> this.path / id => functions.deleteEffect(id).foldZIO(_ => ZIO.succeed(Response.status(Status.BadRequest)),
