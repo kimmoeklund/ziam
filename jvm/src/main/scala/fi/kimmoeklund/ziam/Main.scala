@@ -24,7 +24,7 @@ object Main extends ZIOAppDefault:
     Quill.Postgres.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
   private val passwordFactory: ZLayer[Any, Throwable, Argon2PasswordFactory] = ZLayer.scoped {
     for {
-      factory <- ZIO.attempt(Argon2PasswordFactory())
+      factory <- ZIO.attempt(Argon2PasswordFactory(parallelism = 1, memory = 100 * 1024))
     } yield (factory)
   }
   private val repoLayer = UserRepositoryLive.layer
@@ -44,7 +44,7 @@ object Main extends ZIOAppDefault:
           ++ PermissionsPage.httpValue
           ++ UsersPage.httpValue
           ++ RolesPage.httpValue
-          ++ OrganizationsPage.httpValue
+          ++ OrganizationsPage.httpValue ++ ZiamApi()
       )
       .provide(Server.default, dataSourceLayer, postgresLayer, passwordFactory, repoLayer)
   }
