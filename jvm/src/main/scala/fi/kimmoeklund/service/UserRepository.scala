@@ -6,7 +6,7 @@ import zio.*
 import java.util.UUID
 
 trait UserRepository:
-  def checkUserPassword(userName: String, password: String): IO[ErrorCode, Option[User]]
+  def checkUserPassword(userName: String, password: String): IO[ErrorCode, User]
 
   def addUser(user: NewPasswordUser): IO[ErrorCode, User]
 
@@ -43,7 +43,7 @@ trait UserRepository:
   def deleteUser(id: UUID): IO[ErrorCode, Unit]
 
 object UserRepository:
-  def checkUserPassword(userName: String, password: String): ZIO[UserRepository, ErrorCode, Option[User]] =
+  def checkUserPassword(userName: String, password: String): ZIO[UserRepository, ErrorCode, User] =
     ZIO.serviceWithZIO[UserRepository](_.checkUserPassword(userName, password))
 
   def addOrganization(org: Organization): ZIO[UserRepository, ErrorCode, Organization] =

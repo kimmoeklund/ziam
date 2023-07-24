@@ -28,6 +28,8 @@ case class PasswordCredentials(
     passwordHash: String
 )
 
+type UsersJoin = List[(Members, Members, Option[Roles], Option[Permissions], Option[PasswordCredentials])]
+
 object Transformers:
   def toMember(user: NewPasswordUser): Members =
     user.into[Members].transform(Field.computed(_.organization, u => u.organization.id))
@@ -42,7 +44,7 @@ final class UserRepositoryLive(
   import quill.*
 
   private def mapUsers(
-      users: List[(Members, Members, Option[Roles], Option[Permissions], Option[PasswordCredentials])]
+      users: UsersJoin
   ) =
     val members = users.map(_._1).distinct
     val organizations = users.groupMap(_._1)(_._2)
@@ -80,32 +82,27 @@ final class UserRepositoryLive(
   override def checkUserPassword(
       userName: String,
       password: String
-  ): IO[ErrorCode, Option[User]] = {
-    val combined = run {
+  ): IO[ErrorCode, User] = {
+    run {
       for {
         creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName))
-      } yield (creds)
-    }.filterOrFail(creds => creds.nonEmpty && argon2Factory.verify(password, creds.head.passwordHash))(
-      GeneralErrors.IncorrectPassword
-    )
-      <&> run {
-        for {
-          creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName))
-          m <- query[Members].join(m => m.id == creds.memberId)
-          o <- query[Members].join(o => o.id == m.organization)
-          rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
-          r <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
-          pg <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
-          p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
-        } yield (m, o, r, p, creds)
-      }.map(list => mapUsers(list.map((m, o, r, p, c) => (m, o, r, p, Some(c)))))
-    combined.mapBoth(
-      {
-        case _: SQLException  => GeneralErrors.Exception
-        case e: GeneralErrors => e
-      },
-      results => results._2.headOption
-    )
+        m <- query[Members].join(m => m.id == creds.memberId)
+        o <- query[Members].join(o => o.id == m.organization)
+        rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
+        r <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
+        pg <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
+        p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
+      } yield (m, o, r, p, creds)
+    }.flatMap(resultsRaw =>
+      ZIO.blocking(
+        resultsRaw.headOption match {
+          case Some(row) =>
+            if argon2Factory.verify(password, row._5.passwordHash) then ZIO.succeed(resultsRaw)
+            else ZIO.fail(GeneralErrors.EntityNotFound(userName))
+          case None => ZIO.fail(GeneralErrors.EntityNotFound(userName))
+        }
+      )
+    ).mapBoth(_ => GeneralErrors.Exception, list => mapUsers(list.map((m, o, r, p, c) => (m, o, r, p, Some(c)))).head)
   }
 
   override def updateUserRoles: IO[ErrorCode, Option[User]] = ???
