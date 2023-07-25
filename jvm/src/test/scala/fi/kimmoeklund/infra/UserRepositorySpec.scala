@@ -28,6 +28,8 @@ object TestScenario:
 
 object UserRepositorySpec extends ZIOSpecDefault:
 
+  val sqliteDs = Quill.DataSource.fromPrefix("ziam-sqlite-db")
+  val sqliteQuill = Quill.Sqlite.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
   val containerLayer = ZLayer.scoped(PostgresContainer.make())
   val dataSourceLayer = ZLayer(ZIO.service[DataSourceBuilder].map(_.dataSource))
   val postgresLayer =
@@ -37,7 +39,10 @@ object UserRepositorySpec extends ZIOSpecDefault:
       factory <- ZIO.attempt(Argon2PasswordFactory())
     } yield (factory)
   }
-  val repoLayer = UserRepositoryLive.layer
+//  val repoLayer = UserRepositoryLive.pgLayer
+
+  val liteRepo = UserRepositoryLive.sqliteLayer
+
   val testScenario = ZState.initial(TestScenario.create)
   val unicodeString =
     Gen.stringBounded(5, 100)(Gen.unicodeChar.filter(c => c != 0x00.toChar && !c.isControl && !c.isWhitespace))
@@ -166,11 +171,14 @@ object UserRepositorySpec extends ZIOSpecDefault:
     )
       + suite("fetch users")(fetchUsers))
       .provideShared(
-        containerLayer,
-        DataSourceBuilderLive.layer,
-        dataSourceLayer,
-        postgresLayer,
+//        containerLayer,
+//        DataSourceBuilderLive.layer,
+//        dataSourceLayer,
+//        postgresLayer,
         passwordFactory,
-        repoLayer,
+//        repoLayer,
+        sqliteDs,
+        sqliteQuill,
+        liteRepo,
         testScenario
       ) @@ sequential @@ samples(1) @@ nondeterministic

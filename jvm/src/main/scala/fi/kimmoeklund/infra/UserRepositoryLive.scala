@@ -6,7 +6,8 @@ import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.service.UserRepository
 import io.getquill.*
 import io.getquill.ast.SetOperator.isEmpty
-import io.getquill.jdbczio.Quill
+import io.getquill.context.sql.idiom.SqlIdiom
+import io.getquill.jdbczio.{Quill, QuillBaseContext}
 import io.github.arainko.ducktape.*
 import org.postgresql.util.PSQLException
 import zio.*
@@ -36,7 +37,8 @@ object Transformers:
   def toRoles(role: Role): Roles = role.to[Roles]
 
 final class UserRepositoryLive(
-    quill: Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]],
+    quill: // Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]] |
+    Quill.Sqlite[CompositeNamingStrategy2[SnakeCase.type, Escape.type]],
     argon2Factory: Argon2PasswordFactory
 ) extends UserRepository:
 
@@ -298,15 +300,28 @@ final class UserRepositoryLive(
 end UserRepositoryLive
 
 object UserRepositoryLive:
-  def layer: ZLayer[
+  def pgLayer: ZLayer[
     Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]] & Argon2PasswordFactory,
     Nothing,
     UserRepository
-  ] = ZLayer {
-    for {
-      quill <- ZIO.service[Quill.Postgres[
-        CompositeNamingStrategy2[SnakeCase.type, Escape.type]
-      ]]
-      argon2Factory <- ZIO.service[Argon2PasswordFactory]
-    } yield UserRepositoryLive(quill, argon2Factory)
-  }
+  ] = ???
+//  ZLayer {
+//    for {
+//      quill <- ZIO.service[Quill.Postgres[
+//        CompositeNamingStrategy2[SnakeCase.type, Escape.type]
+//      ]]
+//      argon2Factory <- ZIO.service[Argon2PasswordFactory]
+//    } yield UserRepositoryLive(quill, argon2Factory)
+//  }
+
+  def sqliteLayer: ZLayer[
+    Quill.Sqlite[CompositeNamingStrategy2[SnakeCase.type, Escape.type]] & Argon2PasswordFactory,
+    Nothing,
+    UserRepository
+  ] =
+    ZLayer {
+      for {
+        quill <- ZIO.service[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase.type, Escape.type]]]
+        argon2Factory <- ZIO.service[Argon2PasswordFactory]
+      } yield UserRepositoryLive(quill, argon2Factory)
+    }
