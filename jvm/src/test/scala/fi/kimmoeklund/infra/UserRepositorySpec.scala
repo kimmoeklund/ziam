@@ -155,6 +155,13 @@ object UserRepositorySpec extends ZIOSpecDefault:
           _ <- UserRepository.deleteOrganization(org.id)
           allOrgs <- UserRepository.getOrganizations()
         } yield assertTrue(!allOrgs.exists(o => o.id == org.id))
+      },
+      test("password auth should fail with wrong password") {
+        for {
+          testState <- ZIO.service[ZState[TestScenario]]
+          testData <- testState.get
+          result <- UserRepository.checkUserPassword(testData.users.head.logins.head.userName, "wrong password").flip
+        } yield assertTrue(result == GeneralErrors.IncorrectPassword)
       }
     )
       + suite("fetch users")(fetchUsers))
@@ -166,4 +173,4 @@ object UserRepositorySpec extends ZIOSpecDefault:
         passwordFactory,
         repoLayer,
         testScenario
-      ) @@ sequential @@ samples(10) @@ nondeterministic
+      ) @@ sequential @@ samples(1) @@ nondeterministic

@@ -98,11 +98,17 @@ final class UserRepositoryLive(
         resultsRaw.headOption match {
           case Some(row) =>
             if argon2Factory.verify(password, row._5.passwordHash) then ZIO.succeed(resultsRaw)
-            else ZIO.fail(GeneralErrors.EntityNotFound(userName))
+            else ZIO.fail(GeneralErrors.IncorrectPassword)
           case None => ZIO.fail(GeneralErrors.EntityNotFound(userName))
         }
       )
-    ).mapBoth(_ => GeneralErrors.Exception, list => mapUsers(list.map((m, o, r, p, c) => (m, o, r, p, Some(c)))).head)
+    ).mapBoth(
+      {
+        case _: SQLException  => GeneralErrors.Exception
+        case e: GeneralErrors => e
+      },
+      list => mapUsers(list.map((m, o, r, p, c) => (m, o, r, p, Some(c)))).head
+    )
   }
 
   override def updateUserRoles: IO[ErrorCode, Option[User]] = ???

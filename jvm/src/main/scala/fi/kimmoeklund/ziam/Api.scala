@@ -20,7 +20,7 @@ object ZiamApi:
         user <- UserRepository.checkUserPassword(userName, password)
       } yield user
       effect.foldZIO(
-        _ => ZIO.succeed(Response.status(Status.Forbidden)),
+        _ => ZIO.succeed(Response.status(Status.Unauthorized)),
         user => ZIO.succeed(Response.json(user.toJson))
       )
 
