@@ -1,21 +1,15 @@
-package fi.kimmoeklund.infra
+package fi.kimmoeklund.service
 
 import com.outr.scalapass.Argon2PasswordFactory
-import de.mkammerer.argon2.Argon2Factory
 import fi.kimmoeklund.domain.*
-import fi.kimmoeklund.service.UserRepository
 import io.getquill.*
-import io.getquill.ast.SetOperator.isEmpty
-import io.getquill.context.sql.idiom.SqlIdiom
-import io.getquill.jdbczio.{Quill, QuillBaseContext}
+import io.getquill.jdbczio.Quill
 import io.github.arainko.ducktape.*
 import org.postgresql.util.PSQLException
 import zio.*
-import zio.DefaultServices.live.unsafe
 
 import java.sql.SQLException
 import java.util.UUID
-import javax.sql.DataSource
 
 case class Members(id: UUID, organization: UUID, name: String)
 case class Memberships(memberId: UUID, parent: UUID)
@@ -37,11 +31,9 @@ object Transformers:
   def toRoles(role: Role): Roles = role.to[Roles]
 
 final class UserRepositoryLive(
-    quill: // Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]] |
-    Quill.Sqlite[CompositeNamingStrategy2[SnakeCase.type, Escape.type]],
+    quill: Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]],
     argon2Factory: Argon2PasswordFactory
 ) extends UserRepository:
-
   import Transformers.*
   import quill.*
 
@@ -106,7 +98,7 @@ final class UserRepositoryLive(
       )
     ).mapBoth(
       {
-        case _: SQLException  => GeneralErrors.Exception
+        case e: SQLException  => GeneralErrors.Exception(e.getMessage)
         case e: GeneralErrors => e
       },
       list => mapUsers(list.map((m, o, r, p, c) => (m, o, r, p, Some(c)))).head
@@ -129,7 +121,7 @@ final class UserRepositoryLive(
           )
         )
       )
-    }.mapBoth(_ => GeneralErrors.Exception, _ => org)
+    }.mapBoth(e => GeneralErrors.Exception(e.getMessage), _ => org)
 
   override def addUser(user: NewPasswordUser): IO[ErrorCode, User] = {
     val members = toMember(user)
@@ -163,7 +155,7 @@ final class UserRepositoryLive(
     }).mapError({
       case e: PSQLException if e.getSQLState() == "23505" && e.getMessage().contains("user_name") =>
         GeneralErrors.UniqueKeyViolation("userName")
-      case t: Throwable => GeneralErrors.Exception
+      case t: Throwable => GeneralErrors.Exception(t.getMessage)
     })
   }
 
@@ -182,7 +174,10 @@ final class UserRepositoryLive(
             )
           }
       } yield (newRole)
-    }.mapBoth(_ => GeneralErrors.Exception, r => r.into[Role].transform(Field.const(_.permissions, role.permissions)))
+    }.mapBoth(
+      e => GeneralErrors.Exception(e.getMessage),
+      r => r.into[Role].transform(Field.const(_.permissions, role.permissions))
+    )
 
   override def addPermission(permission: Permission) =
     (for {
@@ -197,7 +192,7 @@ final class UserRepositoryLive(
           )
         )
       )
-    } yield (permission)).mapBoth(_ => GeneralErrors.Exception, p => p)
+    } yield (permission)).mapBoth(e => GeneralErrors.Exception(e.getMessage), p => p)
 
   override def getUsers: IO[ErrorCode, List[User]] = run {
     for {
@@ -230,20 +225,20 @@ final class UserRepositoryLive(
       ZIO.fail(GeneralErrors.EntityNotFound(ids.diff(permissions.map(_.id)).mkString(",")))
     )
     .mapError({
-      case _: SQLException  => GeneralErrors.Exception
+      case e: SQLException  => GeneralErrors.Exception(e.getMessage)
       case e: GeneralErrors => e
     })
 
   override def deletePermission(id: UUID): IO[ErrorCode, Unit] = {
     run {
       query[Permissions].filter(p => p.id == lift(id)).delete
-    }.mapBoth(_ => GeneralErrors.Exception, _ => ())
+    }.mapBoth(e => GeneralErrors.Exception(e.getMessage), _ => ())
   }
 
   override def deleteRole(id: UUID): IO[ErrorCode, Unit] =
     run {
       query[Roles].filter(r => r.id == lift(id)).delete
-    }.mapBoth(_ => GeneralErrors.Exception, _ => ())
+    }.mapBoth(e => GeneralErrors.Exception(e.getMessage), _ => ())
 
   override def getRoles: IO[ErrorCode, List[Role]] = {
     run {
@@ -269,7 +264,7 @@ final class UserRepositoryLive(
       ZIO.fail(GeneralErrors.EntityNotFound(ids.diff(roles.map(_.id)).mkString(",")))
     )
     .mapError({
-      case _: SQLException  => GeneralErrors.Exception
+      case e: SQLException  => GeneralErrors.Exception(e.getMessage)
       case e: GeneralErrors => e
     })
 
@@ -284,18 +279,18 @@ final class UserRepositoryLive(
   override def deleteOrganization(id: UUID): IO[ErrorCode, Unit] =
     run {
       query[Members].filter(o => o.id == lift(id)).delete
-    }.mapBoth(_ => GeneralErrors.Exception, _ => ())
+    }.mapBoth(e => GeneralErrors.Exception(e.getMessage), _ => ())
 
   override def getOrganizationById(id: UUID): IO[ErrorCode, Organization] =
     run {
       query[Members].filter(o => o.id == lift(id) && o.id == o.organization)
-    }.mapError(e => GeneralErrors.Exception)
+    }.mapError(e => GeneralErrors.Exception(e.getMessage))
       .filterOrFail(_.nonEmpty)(GeneralErrors.EntityNotFound(id.toString))
       .map(list => list.map(m => Organization(m.id, m.name)).head)
 
   override def deleteUser(id: UUID): IO[ErrorCode, Unit] = run {
     query[Members].filter(m => m.id == lift(id)).delete
-  }.mapBoth(_ => GeneralErrors.Exception, _ => ())
+  }.mapBoth(e => GeneralErrors.Exception(e.getMessage), _ => ())
 
 end UserRepositoryLive
 
@@ -314,14 +309,14 @@ object UserRepositoryLive:
 //    } yield UserRepositoryLive(quill, argon2Factory)
 //  }
 
-  def sqliteLayer: ZLayer[
-    Quill.Sqlite[CompositeNamingStrategy2[SnakeCase.type, Escape.type]] & Argon2PasswordFactory,
+  def sqliteLayer(key: String): ZLayer[
+    Map[String, Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]] & Argon2PasswordFactory,
     Nothing,
-    UserRepository
+    Map[String, UserRepository]
   ] =
-    ZLayer {
+    ZLayer(
       for {
-        quill <- ZIO.service[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase.type, Escape.type]]]
+        quill <- ZIO.serviceAt[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]](key)
         argon2Factory <- ZIO.service[Argon2PasswordFactory]
-      } yield UserRepositoryLive(quill, argon2Factory)
-    }
+      } yield Map(key -> UserRepositoryLive(quill.get, argon2Factory).asInstanceOf[UserRepository])
+    )

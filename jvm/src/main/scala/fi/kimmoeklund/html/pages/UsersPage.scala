@@ -3,17 +3,15 @@ package fi.kimmoeklund.html.pages
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.domain.FormError.InputValueInvalid
 import fi.kimmoeklund.html.forms.*
-import fi.kimmoeklund.html.{Effects, Renderer, SimplePage, SiteMap}
+import fi.kimmoeklund.html.{Effects, Renderer}
 import fi.kimmoeklund.service.UserRepository
 import zio.*
 import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
 import zio.http.{html as _, *}
-import zio.prelude.Validation
 
 import java.util.UUID
-import scala.util.Try
 
 object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
 
@@ -114,9 +112,10 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
 
   override def postResult(item: User): Html = item.usersTableSwap
 
-  override def postEffect(req: Request): ZIO[UserRepository, ErrorCode, User] =
+  override def postEffect(req: Request) = {
     val userId = UUID.randomUUID()
     for {
+      repo <- ZIO.serviceAt[UserRepository]("ziam")
       form <- req.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
       newUserForm <- NewUserForm
         .fromOptions(
@@ -128,23 +127,26 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
           form.get("password-confirmation")
         )
         .toZIO
-      orgAndRoles <- UserRepository
+      orgAndRoles <- repo.get
         .getOrganizationById(newUserForm.organizationId)
-        .validatePar(UserRepository.getRolesByIds(newUserForm.roleIds.toSeq))
-      user <- UserRepository.addUser(
+        .validatePar(repo.get.getRolesByIds(newUserForm.roleIds.toSeq))
+      user <- repo.get.addUser(
         NewPasswordUser(userId, newUserForm.name, orgAndRoles._1, newUserForm.credentials, orgAndRoles._2)
       )
     } yield (user)
+  }
 
-  override def deleteEffect(id: String): ZIO[UserRepository, ErrorCode, Unit] = for {
+  override def deleteEffect(id: String) = for {
     uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
-    _ <- UserRepository.deleteUser(uuid)
+    repo <- ZIO.serviceAt[UserRepository]("ziam")
+    _ <- repo.get.deleteUser(uuid)
   } yield ()
 
   override def optionsList(args: List[User]): Html = ???
 
   def getEffect = for {
-    users <- UserRepository.getUsers()
+    _ <- ZIO.logInfo("getting users")
+    repo <- ZIO.serviceAt[UserRepository]("ziam")
+    _ <- ZIO.logInfo("getting users22")
+    users <- repo.get.getUsers
   } yield users
-
-object UsersPage extends SimplePage(Root / "users", SiteMap.tabs.setActiveTab(SiteMap.usersTab), UsersEffects)

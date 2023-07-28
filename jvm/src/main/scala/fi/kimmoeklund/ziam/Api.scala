@@ -10,14 +10,15 @@ import zio.metrics.*
 import scala.util.Try
 
 object ZiamApi:
-  def apply(): HttpApp[UserRepository, Nothing] = Http.collectZIO[Request] {
+  def apply() = Http.collectZIO[Request] {
 
     case request @ Method.POST -> Root / "api" / "auth" =>
       val effect = for {
+        repo <- ZIO.serviceAt[UserRepository]("ziam")
         form <- request.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
         userName <- ZIO.fromTry(Try(form.get("username").get.stringValue.get))
         password <- ZIO.fromTry(Try(form.get("password").get.stringValue.get))
-        user <- UserRepository.checkUserPassword(userName, password)
+        user <- repo.get.checkUserPassword(userName, password)
       } yield user
       effect.foldZIO(
         _ => ZIO.succeed(Response.status(Status.Unauthorized)),

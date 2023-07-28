@@ -1,9 +1,6 @@
-package fi.kimmoeklund.infra
+package fi.kimmoeklund.service
 
-class TestFixtures {
-
-}
-
+class TestFixtures {}
 
 /*
 
@@ -22,4 +19,4 @@ organization
 - dsl - organization
 
 
-*/
+ */

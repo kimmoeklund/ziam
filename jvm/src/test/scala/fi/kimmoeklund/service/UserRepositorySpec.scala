@@ -1,18 +1,12 @@
-package fi.kimmoeklund.infra
+package fi.kimmoeklund.service
 
 import com.outr.scalapass.Argon2PasswordFactory
-import fi.kimmoeklund.domain
 import fi.kimmoeklund.domain.*
-import fi.kimmoeklund.service.UserRepository
-import io.getquill.jdbczio.Quill
-import io.getquill.{Escape, NamingStrategy, PluralizedTableNames, SnakeCase}
 import zio.*
 import zio.test.*
-import zio.test.Assertion.*
 import zio.test.TestAspect.*
 
 import java.util.UUID
-import scala.collection.mutable.ListBuffer
 
 final case class TestScenario(
     organization: Organization,
@@ -28,35 +22,20 @@ object TestScenario:
 
 object UserRepositorySpec extends ZIOSpecDefault:
 
-  val sqliteDs = Quill.DataSource.fromPrefix("ziam-sqlite-db")
-  val sqliteQuill = Quill.Sqlite.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
-  val containerLayer = ZLayer.scoped(PostgresContainer.make())
-  val dataSourceLayer = ZLayer(ZIO.service[DataSourceBuilder].map(_.dataSource))
-  val postgresLayer =
-    Quill.Postgres.fromNamingStrategy(NamingStrategy(SnakeCase, Escape))
-  val passwordFactory: ZLayer[Any, Throwable, Argon2PasswordFactory] = ZLayer.scoped {
-    for {
-      factory <- ZIO.attempt(Argon2PasswordFactory())
-    } yield (factory)
-  }
-//  val repoLayer = UserRepositoryLive.pgLayer
-
-  val liteRepo = UserRepositoryLive.sqliteLayer
-
-  val testScenario = ZState.initial(TestScenario.create)
   val unicodeString =
     Gen.stringBounded(5, 100)(Gen.unicodeChar.filter(c => c != 0x00.toChar && !c.isControl && !c.isWhitespace))
   val asciiString = Gen.stringBounded(3, 12)(Gen.alphaNumericChar)
+  val envKey = "unittest"
 
-  def fetchUsers: ZIO[ZState[TestScenario] & UserRepository, ErrorCode, List[
+  def fetchUsers: ZIO[ZState[TestScenario] & Map[String, UserRepository], ErrorCode, List[
     Spec[Any, Nothing]
-  ]] =
+  ]] = {
     val users = for {
       testData <- ZIO.serviceWithZIO[ZState[TestScenario]](_.get)
       userResults <- ZIO.collectAll(testData.users.map { user =>
         for {
-          // _ <- Console.printLine(s"fetching user ${creds.userId}")
-          user <- UserRepository.checkUserPassword(
+          repo <- ZIO.serviceAt[UserRepository]("unittest")
+          user <- repo.get.checkUserPassword(
             user.logins.head.userName,
             user.logins.head.userName
           )
@@ -77,15 +56,17 @@ object UserRepositorySpec extends ZIOSpecDefault:
         }
       })
     })
+  }
 
-  override def spec =
-    (suite("user repository test with postgres test container")(
+  override def spec = {
+    (suite("UserRepository")(
       test("it should add permission to the database") {
         check(asciiString, Gen.int) { (name, number) =>
           val permission =
             Permission(UUID.randomUUID(), s"permission-$name", number)
           for {
-            result <- UserRepository.addPermission(permission)
+            repo <- ZIO.serviceAt[UserRepository]("unittest")
+            result <- repo.get.addPermission(permission)
             testData <- ZIO.service[ZState[TestScenario]]
             _ <- testData.update(data => data.copy(permissions = data.permissions :+ permission))
           } yield assertTrue(result == permission)
@@ -94,21 +75,23 @@ object UserRepositorySpec extends ZIOSpecDefault:
       test("it should add roles to the database") {
         check(asciiString) { name =>
           for {
+            repo <- ZIO.serviceAt[UserRepository]("unittest")
             testState <- ZIO.service[ZState[TestScenario]]
             testData <- testState.get
             newRole <- ZIO.succeed(
               Role(UUID.randomUUID(), s"role-$name", testData.permissions)
             )
-            role <- UserRepository.addRole(newRole)
+            role <- repo.get.addRole(newRole)
             _ <- testState.update(data => data.copy(roles = data.roles :+ newRole))
           } yield assertTrue(role == newRole)
         }
       },
       test("it should add organization to the database") {
         for {
+          repo <- ZIO.serviceAt[UserRepository]("unittest")
           testState <- ZIO.service[ZState[TestScenario]]
           testData <- testState.get
-          org <- UserRepository.addOrganization(testData.organization)
+          org <- repo.get.addOrganization(testData.organization)
         } yield assertTrue(org == testData.organization)
       },
       test("it should add user to the database") {
@@ -116,10 +99,11 @@ object UserRepositorySpec extends ZIOSpecDefault:
           {
             val userId = UUID.randomUUID()
             for {
+              repo <- ZIO.serviceAt[UserRepository]("unittest")
               testState <- ZIO.service[ZState[TestScenario]]
               testData <- testState.get
               newPassword <- NewPasswordCredentials.fromOptions(Some(userName), Some(userName), Some(userName)).toZIO
-              success <- UserRepository.addUser(
+              success <- repo.get.addUser(
                 NewPasswordUser(userId, randomName, testOrg, newPassword, testData.roles)
               )
               _ <- testState.update(data =>
@@ -133,52 +117,53 @@ object UserRepositorySpec extends ZIOSpecDefault:
       },
       test("it should get and delete permission from the database") {
         for {
-          permission <- UserRepository.addPermission(Permission(UUID.randomUUID(), "test permission", 1))
-          _ <- UserRepository.deletePermission(permission.id)
-          allPermissions <- UserRepository.getPermissions()
+          repo <- ZIO.serviceAt[UserRepository]("unittest")
+          permission <- repo.get.addPermission(Permission(UUID.randomUUID(), "test permission", 1))
+          _ <- repo.get.deletePermission(permission.id)
+          allPermissions <- repo.get.getPermissions
         } yield assertTrue(!allPermissions.exists(p => p.id == permission.id))
       },
       test(label = "it should get permissions by id") {
         for {
+          repo <- ZIO.serviceAt[UserRepository]("unittest")
           testState <- ZIO.service[ZState[TestScenario]]
           testData <- testState.get
-          permissions <- UserRepository.getPermissionsById(testData.permissions.map(p => p.id))
+          permissions <- repo.get.getPermissionsById(testData.permissions.map(p => p.id))
         } yield assertTrue(permissions == testData.permissions)
       },
       test("it should delete roles from the database") {
         for {
+          repo <- ZIO.serviceAt[UserRepository]("unittest")
           testState <- ZIO.service[ZState[TestScenario]]
           testData <- testState.get
-          role <- UserRepository.addRole(Role(UUID.randomUUID(), "test role", testData.permissions))
-          _ <- UserRepository.deleteRole(role.id)
-          allRoles <- UserRepository.getRoles()
+          role <- repo.get.addRole(Role(UUID.randomUUID(), "test role", testData.permissions))
+          _ <- repo.get.deleteRole(role.id)
+          allRoles <- repo.get.getRoles
         } yield assertTrue(!allRoles.exists(r => r.id == role.id))
       },
       test(label = "it should delete organization") {
         for {
-          org <- UserRepository.addOrganization(Organization(UUID.randomUUID(), "test org2"))
-          _ <- UserRepository.deleteOrganization(org.id)
-          allOrgs <- UserRepository.getOrganizations()
+          repo <- ZIO.serviceAt[UserRepository]("unittest")
+          org <- repo.get.addOrganization(Organization(UUID.randomUUID(), "test org2"))
+          _ <- repo.get.deleteOrganization(org.id)
+          allOrgs <- repo.get.getOrganizations
         } yield assertTrue(!allOrgs.exists(o => o.id == org.id))
       },
       test("password auth should fail with wrong password") {
         for {
+          repo <- ZIO.serviceAt[UserRepository]("unittest")
           testState <- ZIO.service[ZState[TestScenario]]
           testData <- testState.get
-          result <- UserRepository.checkUserPassword(testData.users.head.logins.head.userName, "wrong password").flip
+          result <- repo.get.checkUserPassword(testData.users.head.logins.head.userName, "wrong password").flip
         } yield assertTrue(result == GeneralErrors.IncorrectPassword)
       }
     )
       + suite("fetch users")(fetchUsers))
       .provideShared(
-//        containerLayer,
-//        DataSourceBuilderLive.layer,
-//        dataSourceLayer,
-//        postgresLayer,
-        passwordFactory,
-//        repoLayer,
-        sqliteDs,
-        sqliteQuill,
-        liteRepo,
-        testScenario
+        ZState.initial(TestScenario.create),
+        DataSourceLayer.sqlite(envKey),
+        DataSourceLayer.quill(envKey),
+        UserRepositoryLive.sqliteLayer(envKey),
+        Argon2.passwordFactory
       ) @@ sequential @@ samples(1) @@ nondeterministic
+  }

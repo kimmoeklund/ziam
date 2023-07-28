@@ -28,6 +28,10 @@ lazy val ziam = crossProject(JSPlatform, JVMPlatform)
       "io.github.arainko" %% "ducktape" % "0.1.8",
       "dev.zio" %% "zio-prelude" % "1.0.0-RC19",
       "dev.zio" %% "zio-cli" % "0.5.0",
+//      "dev.zio" %% "zio-config" % "4.0.0-RC16",
+//      "dev.zio" %% "zio-config-magnolia" % "4.0.0-RC16",
+//      "dev.zio" %% "zio-config-typesafe" % "4.0.0-RC16",
+//      "dev.zio" %% "zio-config-refined" % "4.0.0-RC16",
       "dev.zio" %% "zio-test" % zioVersion % Test,
       "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
       "dev.zio" %% "zio-test-junit" % zioVersion % Test,
@@ -35,13 +39,11 @@ lazy val ziam = crossProject(JSPlatform, JVMPlatform)
       "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersVersion % Test,
       "dev.zio" %% "zio-test-magnolia" % zioVersion % Test
     ),
-    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
-    // addCompilerPlugin("com.hmemcpy" %% "zio-clippy" % "0.0.1")
+    testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
+    addCompilerPlugin("com.hmemcpy" %% "zio-clippy" % "0.0.1"),
+    Default / mainClass := Some("fi.kimmoeklund.ziam.Main")
   )
   .jsSettings(
     libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "2.4.0",
     scalaJSUseMainModuleInitializer := true
   )
-
-//enablePlugins(NativeImagePlugin)
-//Compile / mainClass := Some("fi.kimmoeklund.ziam.MainApp")

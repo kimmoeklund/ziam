@@ -2,7 +2,7 @@ package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.FormError.*
 import fi.kimmoeklund.domain.Role
-import fi.kimmoeklund.html.{Effects, Renderer, SimplePage, SiteMap}
+import fi.kimmoeklund.html.{Effects, Renderer}
 import fi.kimmoeklund.service.UserRepository
 import zio.*
 import zio.http.html.*
@@ -39,10 +39,12 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
   }
 
   override def getEffect = for {
-    roles <- UserRepository.getRoles()
+    repo <- ZIO.serviceAt[UserRepository]("ziam")
+    roles <- repo.get.getRoles
   } yield roles
 
   def postEffect(request: Request) = for {
+    repo <- ZIO.serviceAt[UserRepository]("ziam")
     form <- request.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
     name <- ZIO.fromTry(Try(form.get("name").get.stringValue.get)).orElseFail(MissingInput("name"))
     inputUuids <- ZIO
@@ -63,14 +65,15 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
           case _                           => MissingInput("permissions")
         }
       )
-    permissions <- UserRepository.getPermissionsById(inputUuids.toList)
+    permissions <- repo.get.getPermissionsById(inputUuids.toList)
     _ <- ZIO.logInfo(inputUuids.mkString(","))
-    r <- UserRepository.addRole(Role(UUID.randomUUID(), name, permissions))
+    r <- repo.get.addRole(Role(UUID.randomUUID(), name, permissions))
   } yield r
 
   override def deleteEffect(id: String) = for {
+    repo <- ZIO.serviceAt[UserRepository]("ziam")
     uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
-    _ <- UserRepository.deleteRole(uuid)
+    _ <- repo.get.deleteRole(uuid)
   } yield ()
 
   override def postResult(item: Role): Html = item.htmlTableRowSwap
@@ -123,5 +126,3 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
   override def optionsList(args: List[Role]): Html =
     args.map(r => option(r.name, valueAttr := r.id.toString))
 }
-
-object RolesPage extends SimplePage(Root / "roles", SiteMap.tabs.setActiveTab(SiteMap.rolesTab), RolesEffects)

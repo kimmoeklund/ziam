@@ -1,15 +1,15 @@
-package fi.kimmoeklund.infra
+package fi.kimmoeklund.service
 
-import javax.sql.DataSource
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import org.postgresql.ds.PGSimpleDataSource
-import zio._
+import zio.*
+
+import javax.sql.DataSource
 
 trait DataSourceBuilder:
   def dataSource: DataSource
 
-final class DataSourceBuilderLive(container: PostgreSQLContainer)
-    extends DataSourceBuilder:
+final class DataSourceBuilderLive(container: PostgreSQLContainer) extends DataSourceBuilder:
   val dataSource: DataSource =
     val ds = new PGSimpleDataSource()
     ds.setUrl(container.jdbcUrl)

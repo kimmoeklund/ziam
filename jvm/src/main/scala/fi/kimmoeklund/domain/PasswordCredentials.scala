@@ -4,11 +4,10 @@ import zio.prelude.Validation
 
 import java.util.UUID
 
-case class NewPasswordCredentials private (userName: String, password: String):
-  private def copy: Unit = ()
+case class NewPasswordCredentials(userName: String, password: String)
 
 object NewPasswordCredentials:
-  private def apply(userName: String, password: String): NewPasswordCredentials =
+  def apply(userName: String, password: String): NewPasswordCredentials =
     new NewPasswordCredentials(userName, password)
 
   def fromOptions(
