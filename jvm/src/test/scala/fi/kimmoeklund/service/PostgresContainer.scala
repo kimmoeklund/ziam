@@ -1,9 +1,8 @@
-package fi.kimmoeklund.infra
+package fi.kimmoeklund.service
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
-
-import zio._
+import zio.*
 
 object PostgresContainer:
   def make(imageName: String = "postgres:alpine") =
@@ -19,8 +18,8 @@ object PostgresContainer:
             a.withInitScript("ziam_schema.sql")
             a.withReuse(true)
             ()
-          }      
+          }
         c.start()
         c
       }
-  } { container => ZIO.succeed(()) } 
+    } { container => ZIO.succeed(()) }

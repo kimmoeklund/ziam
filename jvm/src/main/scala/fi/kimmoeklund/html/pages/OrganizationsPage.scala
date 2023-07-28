@@ -1,7 +1,7 @@
 package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.{ErrorCode, FormError, Organization}
-import fi.kimmoeklund.html.{Effects, Renderer, SimplePage, SiteMap}
+import fi.kimmoeklund.html.{Effects, Renderer}
 import fi.kimmoeklund.service.UserRepository
 import zio.ZIO
 import zio.http.html.*
@@ -38,21 +38,24 @@ object OrganizationsEffects extends Effects[UserRepository, Organization] with R
       )
   }
 
-  override def getEffect: ZIO[UserRepository, ErrorCode, List[Organization]] =
+  override def getEffect: ZIO[Map[String, UserRepository], ErrorCode, List[Organization]] =
     for {
-      organizations <- UserRepository.getOrganizations()
+      repo <- ZIO.serviceAt[UserRepository]("ziam")
+      organizations <- repo.get.getOrganizations
     } yield organizations
 
-  override def postEffect(req: Request): ZIO[UserRepository, ErrorCode, Organization] =
+  override def postEffect(req: Request): ZIO[Map[String, UserRepository], ErrorCode, Organization] =
     for {
+      repo <- ZIO.serviceAt[UserRepository]("ziam")
       form <- req.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
       name <- ZIO.fromTry(Try(form.get("name").get.stringValue.get)).orElseFail(MissingInput("name"))
-      o <- UserRepository.addOrganization(Organization(UUID.randomUUID(), name))
+      o <- repo.get.addOrganization(Organization(UUID.randomUUID(), name))
     } yield o
 
-  override def deleteEffect(id: String): ZIO[UserRepository, ErrorCode, Unit] = for {
+  override def deleteEffect(id: String): ZIO[Map[String, UserRepository], ErrorCode, Unit] = for {
     uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
-    _ <- UserRepository.deleteOrganization(uuid)
+    repo <- ZIO.serviceAt[UserRepository]("ziam")
+    _ <- repo.get.deleteOrganization(uuid)
   } yield ()
 
   override def htmlTable(args: List[Organization]): Html = {
@@ -88,10 +91,3 @@ object OrganizationsEffects extends Effects[UserRepository, Organization] with R
 
   override def optionsList(args: List[Organization]): Html = args.map(o => option(o.name, valueAttr := o.id.toString))
 }
-
-object OrganizationsPage
-    extends SimplePage(
-      Root / "organizations",
-      SiteMap.tabs.setActiveTab(SiteMap.organizationsTab),
-      OrganizationsEffects
-    )

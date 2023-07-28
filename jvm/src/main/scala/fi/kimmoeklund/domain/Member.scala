@@ -27,6 +27,22 @@ case class NewPasswordUser(
     roles: Seq[Role]
 )
 
+object NewPasswordUser:
+  def fromArguments(
+      name: String,
+      userName: String,
+      password: String,
+      organization: Organization,
+      roles: Seq[Role] = Seq()
+  ) =
+    new NewPasswordUser(
+      UUID.randomUUID(),
+      name,
+      organization,
+      NewPasswordCredentials(userName, password),
+      roles
+    )
+
 object Login:
   given JsonEncoder[LoginType] = DeriveJsonEncoder.gen[LoginType]
   given JsonDecoder[LoginType] = DeriveJsonDecoder.gen[LoginType]
