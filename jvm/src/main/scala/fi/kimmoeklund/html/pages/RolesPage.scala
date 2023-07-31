@@ -2,7 +2,7 @@ package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.FormError.*
 import fi.kimmoeklund.domain.Role
-import fi.kimmoeklund.html.{Effects, Renderer}
+import fi.kimmoeklund.html.Page
 import fi.kimmoeklund.service.UserRepository
 import zio.*
 import zio.http.html.*
@@ -13,10 +13,9 @@ import zio.http.{html as _, *}
 import java.util.UUID
 import scala.util.Try
 
-object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
-
+case class RolesPage(path: String, db: String) extends Page[UserRepository] {
   extension (r: Role) {
-    def htmlTableRow: Dom = tr(
+    def htmlTableRow(db: String): Dom = tr(
       PartialAttribute("hx-target") := "this",
       PartialAttribute("hx-swap") := "delete",
       td(r.name),
@@ -26,25 +25,27 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
         button(
           classAttr := "btn btn-danger" :: Nil,
           "Delete",
-          PartialAttribute("hx-delete") := "/roles/" + r.id.toString
+          PartialAttribute("hx-delete") := s"/$db/roles/${r.id}"
         )
       )
     )
 
-    def htmlTableRowSwap: Dom =
+    def htmlTableRowSwap(db: String): Dom =
       tBody(
         PartialAttribute("hx-swap-oob") := "beforeend:#roles-table",
-        htmlTableRow
+        htmlTableRow(db)
       )
   }
 
-  override def getEffect = for {
-    repo <- ZIO.serviceAt[UserRepository]("ziam")
-    roles <- repo.get.getRoles
-  } yield roles
+  private def getRoles = for {
+    repo <- ZIO.serviceAt[UserRepository](db)
+    orgs <- repo.get.getRoles
+  } yield orgs
 
-  def postEffect(request: Request) = for {
-    repo <- ZIO.serviceAt[UserRepository]("ziam")
+  override def tableList = getRoles.map(roles => htmlTable(roles))
+
+  def post(request: Request) = for {
+    repo <- ZIO.serviceAt[UserRepository](db)
     form <- request.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
     name <- ZIO.fromTry(Try(form.get("name").get.stringValue.get)).orElseFail(MissingInput("name"))
     inputUuids <- ZIO
@@ -68,17 +69,15 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
     permissions <- repo.get.getPermissionsById(inputUuids.toList)
     _ <- ZIO.logInfo(inputUuids.mkString(","))
     r <- repo.get.addRole(Role(UUID.randomUUID(), name, permissions))
-  } yield r
+  } yield (r).htmlTableRowSwap(db)
 
-  override def deleteEffect(id: String) = for {
-    repo <- ZIO.serviceAt[UserRepository]("ziam")
+  override def delete(id: String) = for {
+    repo <- ZIO.serviceAt[UserRepository](db)
     uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
     _ <- repo.get.deleteRole(uuid)
   } yield ()
 
-  override def postResult(item: Role): Html = item.htmlTableRowSwap
-
-  override def htmlTable(roles: List[Role]): Html = {
+  def htmlTable(roles: List[Role]): Html = {
     table(
       classAttr := "table" :: Nil,
       tHead(
@@ -88,11 +87,11 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
           th("Permissions")
         )
       ),
-      tBody(id := "roles-table", roles.map(htmlTableRow))
+      tBody(id := "roles-table", roles.map(_.htmlTableRow(db)))
     ) ++
       form(
         idAttr := "add-role",
-        PartialAttribute("hx-post") := "/roles",
+        PartialAttribute("hx-post") := s"roles",
         PartialAttribute("hx-swap") := "none",
         div(
           classAttr := "mb-3" :: Nil,
@@ -112,7 +111,7 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
             multipleAttr := "multiple",
             nameAttr := "permissions",
             PartialAttribute("hx-params") := "none",
-            PartialAttribute("hx-get") := "/permissions/options",
+            PartialAttribute("hx-get") := s"/$db/permissions/options",
             PartialAttribute("hx-trigger") := "revealed",
             PartialAttribute("hx-target") := "#permissions-select",
             PartialAttribute("hx-swap") := "innerHTML"
@@ -123,6 +122,5 @@ object RolesEffects extends Effects[UserRepository, Role] with Renderer[Role] {
       script(srcAttr := "/scripts")
   }
 
-  override def optionsList(args: List[Role]): Html =
-    args.map(r => option(r.name, valueAttr := r.id.toString))
+  override def optionsList = getRoles.map(roles => roles.map(r => option(r.name, valueAttr := r.id.toString)))
 }

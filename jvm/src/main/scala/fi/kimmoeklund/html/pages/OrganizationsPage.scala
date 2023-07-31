@@ -1,7 +1,7 @@
 package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.{ErrorCode, FormError, Organization}
-import fi.kimmoeklund.html.{Effects, Renderer}
+import fi.kimmoeklund.html.Page
 import fi.kimmoeklund.service.UserRepository
 import zio.ZIO
 import zio.http.html.*
@@ -12,12 +12,12 @@ import zio.http.{Request, html as _, *}
 import java.util.UUID
 import scala.util.Try
 
-object OrganizationsEffects extends Effects[UserRepository, Organization] with Renderer[Organization] {
 
+case class OrganizationsPage(path: String, db: String) extends Page[UserRepository] {
   import FormError.*
-
+  
   extension (o: Organization) {
-    def htmlTableRow: Dom = tr(
+    def htmlTableRow(db: String): Dom = tr(
       PartialAttribute("hx-target") := "this",
       PartialAttribute("hx-swap") := "delete",
       td(o.name),
@@ -26,39 +26,40 @@ object OrganizationsEffects extends Effects[UserRepository, Organization] with R
         button(
           classAttr := "btn btn-danger" :: Nil,
           "Delete",
-          PartialAttribute("hx-delete") := "/organizations/" + o.id.toString
+          PartialAttribute("hx-delete") := s"/$db/organizations/${o.id}"
         )
       )
     )
 
-    def htmlTableRowSwap: Dom =
+    def htmlTableRowSwap(db: String): Html =
       tBody(
         PartialAttribute("hx-swap-oob") := "beforeend:#organizations-table",
-        htmlTableRow
+        htmlTableRow(db)
       )
   }
 
-  override def getEffect: ZIO[Map[String, UserRepository], ErrorCode, List[Organization]] =
-    for {
-      repo <- ZIO.serviceAt[UserRepository]("ziam")
-      organizations <- repo.get.getOrganizations
-    } yield organizations
+  private def getOrganizations = for {
+    repo <- ZIO.serviceAt[UserRepository](db)
+    organizations <- repo.get.getOrganizations
+  } yield organizations
 
-  override def postEffect(req: Request): ZIO[Map[String, UserRepository], ErrorCode, Organization] =
+  override def tableList = getOrganizations.map(orgs => htmlTable(orgs))
+
+  override def post(req: Request) =
     for {
-      repo <- ZIO.serviceAt[UserRepository]("ziam")
+      repo <- ZIO.serviceAt[UserRepository](db)
       form <- req.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
       name <- ZIO.fromTry(Try(form.get("name").get.stringValue.get)).orElseFail(MissingInput("name"))
       o <- repo.get.addOrganization(Organization(UUID.randomUUID(), name))
-    } yield o
+    } yield (o).htmlTableRowSwap(db)
 
-  override def deleteEffect(id: String): ZIO[Map[String, UserRepository], ErrorCode, Unit] = for {
+  override def delete(id: String): ZIO[Map[String, UserRepository], ErrorCode, Unit] = for {
     uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
-    repo <- ZIO.serviceAt[UserRepository]("ziam")
+    repo <- ZIO.serviceAt[UserRepository](db)
     _ <- repo.get.deleteOrganization(uuid)
   } yield ()
 
-  override def htmlTable(args: List[Organization]): Html = {
+  def htmlTable(args: List[Organization]): Html = {
     table(
       classAttr := "table" :: Nil,
       tHead(
@@ -67,11 +68,11 @@ object OrganizationsEffects extends Effects[UserRepository, Organization] with R
           th("ID")
         )
       ),
-      tBody(id := "organizations-table", args.map(htmlTableRow))
+      tBody(id := "organizations-table", args.map(_.htmlTableRow(db)))
     ) ++
       form(
         idAttr := "add-organization",
-        PartialAttribute("hx-post") := "/organizations",
+        PartialAttribute("hx-post") := s"/$db/organizations",
         PartialAttribute("hx-swap") := "none",
         div(
           classAttr := "mb-3" :: Nil,
@@ -87,7 +88,6 @@ object OrganizationsEffects extends Effects[UserRepository, Organization] with R
       script(srcAttr := "/scripts")
   }
 
-  override def postResult(item: Organization): Html = item.htmlTableRowSwap
-
-  override def optionsList(args: List[Organization]): Html = args.map(o => option(o.name, valueAttr := o.id.toString))
+  override def optionsList =
+    getOrganizations.map(orgs => orgs.map(o => option(o.name, valueAttr := o.id.toString)))
 }

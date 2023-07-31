@@ -245,12 +245,13 @@ final class UserRepositoryLive(
       for {
         roles <- query[Roles]
         pg <- query[PermissionGrants].leftJoin(pg => roles.id == pg.roleId)
-        p <- query[Permissions].leftJoin(p => pg.forall(grant => p.id == grant.permissionId))
+        p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
       } yield (roles, pg, p)
-    }.fold(
-      _ => List(),
-      list => mapRoles(list)
-    )
+    }.tapBoth((e: Throwable) => ZIO.logError(e.toString), r => ZIO.logInfo(s"fetched roles: $r"))
+      .fold(
+        _ => List(),
+        list => mapRoles(list)
+      )
   }
 
   override def getRolesByIds(ids: Seq[UUID]): IO[ErrorCode, List[Role]] = run {

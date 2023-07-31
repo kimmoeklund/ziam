@@ -1,23 +1,22 @@
 package fi.kimmoeklund.html
 
 import fi.kimmoeklund.domain.ErrorCode
-import zio.*
+import fi.kimmoeklund.service.PageService
 import zio.http.html.*
 import zio.http.html.Html.fromDomElement
 import zio.http.{html as _, *}
+import zio.{ZIO, *}
 
 trait StaticHtml:
   def htmlValue: Html
 
-trait Effects[R, T]:
-  def getEffect: ZIO[Map[String, R], ErrorCode, List[T]]
-  def postEffect(req: Request): ZIO[Map[String, R], ErrorCode, T]
-  def deleteEffect(id: String): ZIO[Map[String, R], ErrorCode, Unit]
-
-trait Renderer[T]:
-  def htmlTable(args: List[T]): Html
-  def postResult(item: T): Html
-  def optionsList(args: List[T]): Html
+trait Effects[R]:
+  def tableList: ZIO[Map[String, R], ErrorCode, Html]
+  def post(req: Request): ZIO[Map[String, R], ErrorCode, Html]
+  def delete(id: String): ZIO[Map[String, R], ErrorCode, Unit]
+  // def postResult(item: T): Html
+  // def htmlTable(args: List[T]): Html
+  def optionsList: ZIO[Map[String, R], ErrorCode, Html]
 
 trait Menu extends StaticHtml:
   val items: List[MenuItem]
@@ -46,8 +45,15 @@ case class TabMenu(items: List[Tab]) extends Menu:
     }
   }
 
-case class SimplePage[R, T](path: String, functions: Effects[R, T] & Renderer[T]):
+trait Page[-R <: PageService]:
+  val path: String
+  val db: String
 
-  def htmlValue(contentArgs: List[T]): Html = functions.htmlTable(contentArgs)
+  def tableList: ZIO[Map[String, R], ErrorCode, Html]
+  def post(req: Request): ZIO[Map[String, R], ErrorCode, Html]
+  def delete(id: String): ZIO[Map[String, R], ErrorCode, Unit]
+  // def postResult(item: T): Html
+  // def htmlTable(args: List[T]): Html
+  def optionsList: ZIO[Map[String, R], ErrorCode, Html]
 
-//
+//case class SimplePage[R](path: String, functions: Effects[R])
