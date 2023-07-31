@@ -165,5 +165,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
         DataSourceLayer.quill(envKey),
         UserRepositoryLive.sqliteLayer(envKey),
         Argon2.passwordFactory
-      ) @@ sequential @@ samples(1) @@ nondeterministic
+      ) @@ sequential @@ samples(1) @@ nondeterministic @@ beforeAll {
+      DbManagement.provisionDatabase(envKey).provide(DbManagementLive.live)
+    }
   }
