@@ -2,8 +2,8 @@ package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.domain.FormError.InputValueInvalid
+import fi.kimmoeklund.html.Page
 import fi.kimmoeklund.html.forms.*
-import fi.kimmoeklund.html.{Effects, Renderer}
 import fi.kimmoeklund.service.UserRepository
 import zio.*
 import zio.http.html.*
@@ -13,11 +13,9 @@ import zio.http.{html as _, *}
 
 import java.util.UUID
 
-object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
-
+case class UsersPage(path: String, db: String) extends Page[UserRepository] {
   extension (u: User) {
-
-    def htmlTableRow: Dom = tr(
+    def htmlTableRow(db: String): Dom = tr(
       PartialAttribute("hx-target") := "this",
       PartialAttribute("hx-swap") := "delete",
       td(u.id.toString),
@@ -29,19 +27,19 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
         button(
           classAttr := "btn btn-danger" :: Nil,
           "Delete",
-          PartialAttribute("hx-delete") := "/users/" + u.id.toString
+          PartialAttribute("hx-delete") := s"/$db/users/${u.id}"
         )
       )
     )
 
-    def usersTableSwap: Dom =
+    def htmlTableRowSwap(db: String): Html =
       tBody(
         PartialAttribute("hx-swap-oob") := "beforeend:#users-table",
-        htmlTableRow
+        htmlTableRow(db)
       )
   }
 
-  override def htmlTable(args: List[User]): Html =
+  def htmlTable(args: List[User]): Html =
     table(
       classAttr := "table" :: Nil,
       tHead(
@@ -53,10 +51,10 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
           th("Roles")
         )
       ),
-      tBody(id := "users-table", args.map(htmlTableRow))
+      tBody(id := "users-table", args.map(_.htmlTableRow(db)))
     ) ++ form(
       idAttr := "add-users-form",
-      PartialAttribute("hx-post") := "/users",
+      PartialAttribute("hx-post") := s"/$db/users",
       PartialAttribute("hx-swap") := "none",
       label(
         "Name",
@@ -71,7 +69,7 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
         idAttr := "organization-select",
         classAttr := "form-select" :: Nil,
         nameAttr := "organization",
-        PartialAttribute("hx-get") := "/organizations/options",
+        PartialAttribute("hx-get") := s"/$db/organizations/options",
         PartialAttribute("hx-trigger") := "revealed",
         PartialAttribute("hx-params") := "none",
         PartialAttribute("hx-target") := "#organization-select",
@@ -83,7 +81,7 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
         multipleAttr := "multiple",
         classAttr := "form-select" :: Nil,
         nameAttr := "roles",
-        PartialAttribute("hx-get") := "/roles/options",
+        PartialAttribute("hx-get") := s"/$db/roles/options",
         PartialAttribute("hx-trigger") := "revealed",
         PartialAttribute("hx-params") := "none",
         PartialAttribute("hx-target") := "#roles-select",
@@ -110,12 +108,12 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
         script(srcAttr := "/scripts")
     )
 
-  override def postResult(item: User): Html = item.usersTableSwap
+  // override def postResult(item: User): Html = item.usersTableSwap
 
-  override def postEffect(req: Request) = {
+  def post(req: Request) = {
     val userId = UUID.randomUUID()
     for {
-      repo <- ZIO.serviceAt[UserRepository]("ziam")
+      repo <- ZIO.serviceAt[UserRepository](db)
       form <- req.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
       newUserForm <- NewUserForm
         .fromOptions(
@@ -133,20 +131,24 @@ object UsersEffects extends Effects[UserRepository, User] with Renderer[User]:
       user <- repo.get.addUser(
         NewPasswordUser(userId, newUserForm.name, orgAndRoles._1, newUserForm.credentials, orgAndRoles._2)
       )
-    } yield (user)
+    } yield (user).htmlTableRowSwap(db)
   }
 
-  override def deleteEffect(id: String) = for {
-    uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
-    repo <- ZIO.serviceAt[UserRepository]("ziam")
-    _ <- repo.get.deleteUser(uuid)
-  } yield ()
+  override def delete(id: String): ZIO[Map[String, UserRepository], ErrorCode, Unit] = {
+    for {
+      uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
+      repo <- ZIO.serviceAt[UserRepository](db)
+      _ <- repo.get.deleteUser(uuid)
+    } yield ()
+  }
 
-  override def optionsList(args: List[User]): Html = ???
+  def optionsList = ???
 
-  def getEffect = for {
+  def tableList = for {
     _ <- ZIO.logInfo("getting users")
-    repo <- ZIO.serviceAt[UserRepository]("ziam")
+    repo <- ZIO.serviceAt[UserRepository](db)
     _ <- ZIO.logInfo("getting users22")
     users <- repo.get.getUsers
-  } yield users
+  } yield htmlTable(users)
+
+}

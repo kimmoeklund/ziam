@@ -12,10 +12,10 @@ import zio.http.{html as _, *}
 
 import java.util.UUID
 import scala.util.Try
+case class PermissionsPage(path: String, db: String) extends Page[UserRepository] {
 
-object PermissionEffects extends Effects[UserRepository, Permission] with Renderer[Permission]:
   extension (p: Permission) {
-    def htmlTableRow: Dom = tr(
+    def htmlTableRow(db: String): Dom = tr(
       PartialAttribute("hx-target") := "this",
       PartialAttribute("hx-swap") := "delete",
       td(p.target),
@@ -24,25 +24,28 @@ object PermissionEffects extends Effects[UserRepository, Permission] with Render
         button(
           classAttr := "btn btn-danger" :: Nil,
           "Delete",
-          PartialAttribute("hx-delete") := "/permissions/" + p.id.toString
+          PartialAttribute("hx-delete") := s"/$db/permissions/${p.id}"
         )
       )
     )
 
-    def htmlTableRowSwap: Dom =
+    def htmlTableRowSwap(db: String): Dom =
       tBody(
         PartialAttribute("hx-swap-oob") := "beforeend:#permissions-table",
-        htmlTableRow
+        htmlTableRow(db)
       )
   }
 
-  override def getEffect = for {
-    repo <- ZIO.serviceAt[UserRepository]("ziam")
+
+  private def getPermissions = for {
+    repo <- ZIO.serviceAt[UserRepository](db)
     permissions <- repo.get.getPermissions
   } yield permissions
 
-  def postEffect(request: Request) = for {
-    repo <- ZIO.serviceAt[UserRepository]("ziam")
+  override def tableList = getPermissions.map(permissions => htmlTable(permissions))
+
+  def post(request: Request) = for {
+    repo <- ZIO.serviceAt[UserRepository](db)
     form <- request.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
     target <- ZIO.fromTry(Try(form.get("target").get.stringValue.get)).orElseFail(MissingInput("target"))
     permission <- ZIO.fromTry(Try(form.get("permission").get.stringValue.get)).orElseFail(MissingInput("permission"))
@@ -50,26 +53,27 @@ object PermissionEffects extends Effects[UserRepository, Permission] with Render
       .fromTry(Try(permission.toInt))
       .orElseFail(InputValueInvalid("permission", "unable to parse to integer"))
     p <- repo.get.addPermission(Permission(UUID.randomUUID(), target, permissionInt))
-  } yield p
+  } yield (p).htmlTableRowSwap(db)
 
-  override def deleteEffect(id: String) = for {
-    repo <- ZIO.serviceAt[UserRepository]("ziam")
+  override def delete(id: String) = for {
+    repo <- ZIO.serviceAt[UserRepository](db)
     uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
     _ <- repo.get.deletePermission(uuid)
   } yield ()
 
-  override def postResult(item: Permission): Html = item.htmlTableRowSwap
-
-  override def optionsList(args: List[Permission]): Html =
-    val targetMap = args.groupMap(_.target)(p => p)
-    targetMap.keys.toList.map(t =>
-      optgroup(
-        labelAttr := t,
-        targetMap(t).map(p => option(p.permission.toString, valueAttr := p.id.toString))
+  override def optionsList = getPermissions.flatMap(permissions => {
+    val targetMap = permissions.groupMap(_.target)(p => p)
+    ZIO.succeed(
+      targetMap.keys.toList.map(t =>
+        optgroup(
+          labelAttr := t,
+          targetMap(t).map(p => option(p.permission.toString, valueAttr := p.id.toString))
+        )
       )
     )
+  })
 
-  override def htmlTable(permissions: List[Permission]): Html = {
+  def htmlTable(permissions: List[Permission]): Html = {
     table(
       classAttr := "table" :: Nil,
       tHead(
@@ -78,11 +82,11 @@ object PermissionEffects extends Effects[UserRepository, Permission] with Render
           th("Permission")
         )
       ),
-      tBody(id := "permissions-table", permissions.map(htmlTableRow))
+      tBody(id := "permissions-table", permissions.map(_.htmlTableRow(db)))
     ) ++
       form(
         idAttr := "add-permission",
-        PartialAttribute("hx-post") := "/permissions",
+        PartialAttribute("hx-post") := s"/$db/permissions",
         PartialAttribute("hx-swap") := "none",
         label(
           "Target",
@@ -103,3 +107,4 @@ object PermissionEffects extends Effects[UserRepository, Permission] with Render
       ) ++
       script(srcAttr := "/scripts")
   }
+}

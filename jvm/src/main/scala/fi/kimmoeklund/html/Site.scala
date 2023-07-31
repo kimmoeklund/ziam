@@ -1,57 +1,58 @@
 package fi.kimmoeklund.html
 
-import fi.kimmoeklund.domain.{Organization, Permission, Role, User}
 import fi.kimmoeklund.html.pages.*
-import fi.kimmoeklund.service.UserRepository
+import fi.kimmoeklund.service.PageService
 import zio.*
 import zio.http.html.*
 import zio.http.html.Html.fromDomElement
 import zio.http.{html as _, *}
 
-case class Site(
+case class Site[-R <: PageService](
     db: String,
     tabMenu: TabMenu,
-    pages: List[SimplePage[_, _]]
+    pages: List[Page[R]]
 ) {
 
-  private def getPage(path: String) =
-    ZIO.fromOption(pages.find(_.path == path)).orElseFail(Response.status(Status.NotFound))
+  private def getPage(path: String) = // ZIO.succeed(pages.head)
+    ZIO.fromOption(pages.find(f => f.path == path)).orElseFail(Response.status(Status.NotFound))
 
-  private def setActive(page: SimplePage[_, _]) = tabMenu.setActiveTab(Root / db / page.path)
+  private def setActive(page: Page[R]) = tabMenu.setActiveTab(Root / db / page.path)
 
-  def htmlValue(page: SimplePage[_, _], result: List[T]): Html =
-    html(htmxHead ++ body(div(classAttr := "container" :: Nil, tabMenu.htmlValue, page.htmlValue(result))))
+  def htmlValue(page: Html): Html =
+    html(htmxHead ++ body(div(classAttr := "container" :: Nil, tabMenu.htmlValue, page)))
 
-  def httpValue = Http.collectZIO[Request] {
-    case Method.GET -> Root / this.db / path / format =>
-      getPage(path).flatMap(page =>
-        page.functions.getEffect
-          .foldZIO(
-            e => ZIO.succeed(Response.text(e.toString).withStatus(Status.InternalServerError)),
-            (result: List[T]) =>
-              format match
-                case "options" => ZIO.succeed(htmlSnippet(page.functions.optionsList(result)))
-                case _         => ZIO.succeed(Response.html(htmlValue(page, result)))
+  def httpValue: App[Map[String, R]] = Http.collectZIO[Request] {
+    case request @ Method.GET -> Root / this.db / path / format =>
+      format match {
+        case "options" =>
+          getPage(path).flatMap(page =>
+            page.optionsList
+              .mapBoth(
+                e => Response.text(e.toString).withStatus(Status.InternalServerError),
+                (p: Html) => htmlSnippet(p)
+              )
           )
-      )
+
+        case _ => ZIO.succeed(Response.status(Status.UnsupportedMediaType))
+      }
 
     case Method.GET -> Root / this.db / path =>
       getPage(path).flatMap(page =>
-        page.functions.getEffect.foldZIO(
+        page.tableList.foldZIO(
           e => {
             for {
               _ <- ZIO.logInfo(e.toString)
               response <- ZIO.succeed(Response.text(e.toString).withStatus(Status.InternalServerError))
             } yield response
           },
-          (result: List[T]) => ZIO.succeed(Response.html(htmlValue(page, result)))
+          (result: Html) => ZIO.succeed(Response.html(htmlValue(result)))
         )
       )
 
     case req @ Method.POST -> Root / this.db / path =>
       getPage(path).flatMap(page =>
-        page.functions
-          .postEffect(req)
+        page
+          .post(req)
           .foldCauseZIO(
             { case c: Cause[_] =>
               ZIO.succeed(
@@ -64,15 +65,15 @@ case class Site(
             },
             p =>
               ZIO.succeed(
-                htmlSnippet(page.functions.postResult(p)).addHeader("HX-Trigger-After-Swap", "resetAndFocusForm")
+                htmlSnippet(p).addHeader("HX-Trigger-After-Swap", "resetAndFocusForm")
               )
           )
       )
 
     case Method.DELETE -> Root / this.db / path / id =>
       getPage(path).flatMap(page =>
-        page.functions
-          .deleteEffect(id)
+        page
+          .delete(id)
           .foldZIO(_ => ZIO.succeed(Response.status(Status.BadRequest)), _ => ZIO.succeed(Response.status(Status.Ok)))
       )
   }
@@ -81,27 +82,12 @@ case class Site(
 object Site {
   def build(db: String) = {
     val pages = List(
-      SimplePage[UserRepository, User]("users", UsersEffects),
-      SimplePage[UserRepository, Organization]("organizations", OrganizationsEffects),
-      SimplePage[UserRepository, Permission]("permissions", PermissionEffects),
-      SimplePage[UserRepository, Role]("roles", RolesEffects)
+      UsersPage("users", db),
+      OrganizationsPage("organizations", db),
+      RolesPage("roles", db),
+      PermissionsPage("permissions", db)
     )
     val tabs = pages.map(p => Tab(p.path.capitalize, Root / db / p.path, false))
     Site(db, TabMenu(tabs), pages)
   }
 }
-
-//object SiteMap {
-//  val organizationsTab = Tab("Organizations", Root / "organizations")
-//  val usersTab = Tab("Users", Root / "users")
-//  val permissionsTab = Tab("Permissions", Root / "permissions")
-//  val rolesTab = Tab("Roles", Root / "roles")
-//  val tabs = TabMenu(
-//    List(
-//      organizationsTab,
-//      usersTab,
-//      permissionsTab,
-//      rolesTab
-//    )
-//  )
-//}

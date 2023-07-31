@@ -1,6 +1,7 @@
 package fi.kimmoeklund.ziam
 
 import com.outr.scalapass.Argon2PasswordFactory
+import fi.kimmoeklund.html.Site
 import fi.kimmoeklund.service.*
 import io.getquill.{Escape, SnakeCase}
 import zio.*
@@ -48,18 +49,14 @@ object Main extends ZIOAppDefault:
     case Method.GET -> Root => Handler.response(Response.redirect(URL(Root / "ziam" / "users"))).toHttp
   }
 
+  val site = Site.build("ziam")
+
   val httpApps =
-    (scriptsAndMainPage.withDefaultErrorResponse
-//      ++ PermissionsPage.httpValue
-//      ++ UsersPage.httpValue
-//      ++ RolesPage.httpValue
-//      ++ OrganizationsPage.httpValue
-    ) @@ whenRequestZIO(invalidCookie)(basicAuthAndAddCookie) ++ ZiamApi()
+    (scriptsAndMainPage.withDefaultErrorResponse ++ site.httpValue) @@ whenRequestZIO(invalidCookie)(
+      basicAuthAndAddCookie
+    ) ++ ZiamApi()
 
   def run = {
-//    ZIO
-//      .config(DbConfig.config)
-//      .flatMap(config =>
     Server
       .serve(httpApps)
       .provide(
@@ -69,5 +66,4 @@ object Main extends ZIOAppDefault:
         DataSourceLayer.sqlite("ziam"),
         UserRepositoryLive.sqliteLayer("ziam")
       )
-//      )
   }
