@@ -7,8 +7,19 @@ val zioMockVersion = "1.0.0-RC8"
 ThisBuild / scalaVersion := "3.3.0"
 ThisBuild / organization := "fi.kimmoeklund"
 
-lazy val root = project.in(file(".")).aggregate(ziam.js, ziam.jvm).settings(publish := {}, publishLocal := {})
+ThisBuild / assemblyMergeStrategy := {
+  case x if x.endsWith("module-info.class") => MergeStrategy.discard
+  case PathList("META-INF", "io.netty.versions.properties", xs@ _*) => MergeStrategy.concat
+  case PathList("io", "getquill", xs@ _*) => MergeStrategy.first
+  case x =>
+    val oldStrategy = (ThisBuild / assemblyMergeStrategy).value
+    oldStrategy(x)
+}
 
+lazy val copyJS = TaskKey[Unit]("copyJS")
+copyJS := println("foo")
+
+lazy val root = project.in(file(".")).aggregate(ziam.js, ziam.jvm).settings(publish := {}, publishLocal := {}, mainClass := Some("fi.kimmoeklund.ziam.Main"))
 lazy val ziam = crossProject(JSPlatform, JVMPlatform)
   .in(file("."))
   .jvmSettings(
@@ -41,9 +52,11 @@ lazy val ziam = crossProject(JSPlatform, JVMPlatform)
     ),
     testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
     addCompilerPlugin("com.hmemcpy" %% "zio-clippy" % "0.0.1"),
-    Default / mainClass := Some("fi.kimmoeklund.ziam.Main")
+    assembly / mainClass := Some("fi.kimmoeklund.ziam.Main"),
+    assembly / assemblyJarName := "ziam.jar"
   )
   .jsSettings(
     libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "2.4.0",
-    scalaJSUseMainModuleInitializer := true
+    scalaJSUseMainModuleInitializer := true,
   )
+  
