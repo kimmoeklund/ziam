@@ -10,14 +10,6 @@ import zio.{ZIO, *}
 trait StaticHtml:
   def htmlValue: Html
 
-trait Effects[R]:
-  def tableList: ZIO[Map[String, R], ErrorCode, Html]
-  def post(req: Request): ZIO[Map[String, R], ErrorCode, Html]
-  def delete(id: String): ZIO[Map[String, R], ErrorCode, Unit]
-  // def postResult(item: T): Html
-  // def htmlTable(args: List[T]): Html
-  def optionsList: ZIO[Map[String, R], ErrorCode, Html]
-
 trait Menu extends StaticHtml:
   val items: List[MenuItem]
 
@@ -52,8 +44,5 @@ trait Page[-R <: PageService]:
   def tableList: ZIO[Map[String, R], ErrorCode, Html]
   def post(req: Request): ZIO[Map[String, R], ErrorCode, Html]
   def delete(id: String): ZIO[Map[String, R], ErrorCode, Unit]
-  // def postResult(item: T): Html
-  // def htmlTable(args: List[T]): Html
   def optionsList: ZIO[Map[String, R], ErrorCode, Html]
 
-//case class SimplePage[R](path: String, functions: Effects[R])
