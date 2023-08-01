@@ -30,14 +30,11 @@ object Main extends ZIOAppDefault:
   private val basicAuthAndAddCookie =
     basicAuthZIO(creds =>
       for {
-        _ <- ZIO.logInfo("checking basic auth")
         repo <- ZIO.serviceAt[UserRepository]("ziam")
-        _ <- ZIO.logInfo("checking basic auth2")
         result <- repo.get
           .checkUserPassword(creds.uname, creds.upassword)
           .tapError(e => ZIO.logInfo(e.toString))
           .fold(_ => false, _ => true)
-        _ <- ZIO.logInfo(s"checking basic auth3: ${result}")
       } yield (result)
     ) >>> whenStatus(status => status != Status.Unauthorized)(
       addCookie(authCookie) >>> signCookies(cookieSecret)
