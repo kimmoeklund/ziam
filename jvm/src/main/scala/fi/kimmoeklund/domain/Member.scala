@@ -13,16 +13,13 @@ enum LoginType {
   case PasswordCredentials
 }
 
-given ZiamHtml[LoginType] = (s, e) => List(e(s.toString))
-
 type UserId = UUID
 type OrganizationId = UUID
 
-case class Login(userName: String, loginType: LoginType) derives ZiamHtml
+case class Login(userName: String, loginType: LoginType) 
 
 case class User(id: UUID, name: String, organization: Organization, roles: Seq[Role], logins: Seq[Login]) extends Member
-    derives ZiamHtml
-case class Organization(id: UUID, name: String) extends Member derives ZiamHtml
+case class Organization(id: UUID, name: String) extends Member 
 case class NewPasswordUser(
     id: UserId,
     name: String,
@@ -64,3 +61,4 @@ object User:
 object Organization:
   given JsonEncoder[Organization] = DeriveJsonEncoder.gen[Organization]
   given JsonDecoder[Organization] = DeriveJsonDecoder.gen[Organization]
+
