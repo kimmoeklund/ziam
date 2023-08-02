@@ -5,6 +5,7 @@ import zio.prelude.Validation
 import zio.schema.codec
 
 import java.util.UUID
+import fi.kimmoeklund.html.ZiamHtml
 
 sealed trait Member
 
@@ -12,13 +13,16 @@ enum LoginType {
   case PasswordCredentials
 }
 
+given ZiamHtml[LoginType] = (s, e) => List(e(s.toString))
+
 type UserId = UUID
 type OrganizationId = UUID
 
-case class Login(userName: String, loginType: LoginType)
+case class Login(userName: String, loginType: LoginType) derives ZiamHtml
 
 case class User(id: UUID, name: String, organization: Organization, roles: Seq[Role], logins: Seq[Login]) extends Member
-case class Organization(id: UUID, name: String) extends Member
+    derives ZiamHtml
+case class Organization(id: UUID, name: String) extends Member derives ZiamHtml
 case class NewPasswordUser(
     id: UserId,
     name: String,

@@ -2,8 +2,9 @@ package fi.kimmoeklund.domain
 
 import java.util.UUID
 import zio.json._
+import fi.kimmoeklund.html.ZiamHtml
 
-case class Role(id: UUID, name: String, permissions: Seq[Permission])
+case class Role(id: UUID, name: String, permissions: Seq[Permission]) derives ZiamHtml
 
 object Role:
   given JsonEncoder[Role] = DeriveJsonEncoder.gen[Role]
