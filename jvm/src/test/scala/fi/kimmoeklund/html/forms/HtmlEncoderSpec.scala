@@ -30,6 +30,10 @@ object HtmlEncoderSpec extends ZIOSpecDefault:
     test("it should wrap User parameter names with <td>") {
       assertTrue(HtmlEncoder[User].wrapParametersWith(td).map(_.encode).mkString("") == "<td>id</td><td>name</td><td>organization</td><td>roles</td><td>logins</td>")
     },
+    test("it should wrap User parameter names capitalized with <td> ") {
+      val result = HtmlEncoder[User].wrapParametersWith(td, _.capitalize).map(_.encode).mkString("") 
+      assertTrue(result == "<td>Id</td><td>Name</td><td>Organization</td><td>Roles</td><td>Logins</td>")
+    },
     test("it should wrap enum value inside <td>") {
       assertTrue(LoginType.PasswordCredentials.wrapWith(td).map(_.encode).mkString("") == "<td>PasswordCredentials</td>")
     },
