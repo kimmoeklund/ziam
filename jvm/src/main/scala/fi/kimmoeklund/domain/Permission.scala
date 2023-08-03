@@ -2,7 +2,7 @@ package fi.kimmoeklund.domain
 
 import java.util.UUID
 import zio.json.*
-import fi.kimmoeklund.html.ZiamHtml
+import fi.kimmoeklund.html.HtmlEncoder
 
 case class Permission(id: UUID, target: String, permission: Int) extends Ordered[Permission] {
   import scala.math.Ordered.orderingToOrdered
@@ -12,6 +12,6 @@ case class Permission(id: UUID, target: String, permission: Int) extends Ordered
 object Permission:
   given JsonEncoder[Permission] = DeriveJsonEncoder.gen[Permission]
   given JsonDecoder[Permission] = DeriveJsonDecoder.gen[Permission]
-  given ZiamHtml[Permission] = ZiamHtml.derived[Permission]
+  given HtmlEncoder[Permission] = HtmlEncoder.derived[Permission]
 
 
