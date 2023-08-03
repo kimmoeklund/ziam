@@ -12,46 +12,50 @@ import zio.http.html.Html.fromDomElement
 import zio.http.{html as _, *}
 
 import java.util.UUID
+import fi.kimmoeklund.html.HtmlEncoder
+import fi.kimmoeklund.html.wrapWith
+import io.github.arainko.ducktape.*
 
-case class UsersPage(path: String, db: String) extends Page[UserRepository] {
-  extension (u: User) {
-    def htmlTableRow(db: String): Dom = tr(
-      PartialAttribute("hx-target") := "this",
-      PartialAttribute("hx-swap") := "delete",
-      td(u.id.toString),
-      td(u.name),
-      td(u.logins.map(l => s"${l.userName} (${l.loginType.toString})").mkString(",")),
-      td(u.organization.name),
-      td(u.roles.map(_.name).mkString(", ")),
-      td(
-        button(
-          classAttr := "btn btn-danger" :: Nil,
-          "Delete",
-          PartialAttribute("hx-delete") := s"/$db/users/${u.id}"
+case class UserView(id: UUID, name: String, organization: String, roles: Seq[Role], logins: Seq[Login]): 
+
+    def htmlTableRow(db: String): Dom =
+      tr(
+        PartialAttribute("hx-target") := "this",
+        PartialAttribute("hx-swap") := "delete",
+        this.wrapWith(td),
+        td(
+          button(
+            classAttr := "btn btn-danger" :: Nil,
+            "Delete",
+            PartialAttribute("hx-delete") := s"/$db/users/${this.id}"
+          )
         )
       )
-    )
 
     def htmlTableRowSwap(db: String): Html =
       tBody(
         PartialAttribute("hx-swap-oob") := "beforeend:#users-table",
         htmlTableRow(db)
       )
-  }
+
+object UserView:
+  def from(u: User) = u.into[UserView].transform(Field.computed(_.organization, u => u.organization.name))
+  given HtmlEncoder[LoginType] = HtmlEncoder.derived[LoginType]
+  given HtmlEncoder[Login] = HtmlEncoder.derived[Login]
+  given HtmlEncoder[Role] = HtmlEncoder.derived[Role]
+  given HtmlEncoder[UserView] = HtmlEncoder.derived[UserView]
+
+case class UsersPage(path: String, db: String) extends Page[UserRepository] {
 
   def htmlTable(args: List[User]): Html =
     table(
       classAttr := "table" :: Nil,
       tHead(
         tr(
-          th("Id"),
-          th("Name"),
-          th("User login"),
-          th("Organization"),
-          th("Roles")
+          HtmlEncoder[UserView].wrapParametersWith(th, _.capitalize)
         )
       ),
-      tBody(id := "users-table", args.map(_.htmlTableRow(db)))
+      tBody(id := "users-table", args.map(u => UserView.from(u).htmlTableRow(db)))
     ) ++ form(
       idAttr := "add-users-form",
       PartialAttribute("hx-post") := s"/$db/users",
@@ -108,8 +112,6 @@ case class UsersPage(path: String, db: String) extends Page[UserRepository] {
         script(srcAttr := "/scripts")
     )
 
-  // override def postResult(item: User): Html = item.usersTableSwap
-
   def post(req: Request) = {
     val userId = UUID.randomUUID()
     for {
@@ -131,7 +133,7 @@ case class UsersPage(path: String, db: String) extends Page[UserRepository] {
       user <- repo.get.addUser(
         NewPasswordUser(userId, newUserForm.name, orgAndRoles._1, newUserForm.credentials, orgAndRoles._2)
       )
-    } yield (user).htmlTableRowSwap(db)
+    } yield (UserView.from(user)).htmlTableRowSwap(db)
   }
 
   override def delete(id: String): ZIO[Map[String, UserRepository], ErrorCode, Unit] = {
@@ -145,9 +147,7 @@ case class UsersPage(path: String, db: String) extends Page[UserRepository] {
   def optionsList = ???
 
   def tableList = for {
-    _ <- ZIO.logInfo("getting users")
     repo <- ZIO.serviceAt[UserRepository](db)
-    _ <- ZIO.logInfo("getting users22")
     users <- repo.get.getUsers
   } yield htmlTable(users)
 
