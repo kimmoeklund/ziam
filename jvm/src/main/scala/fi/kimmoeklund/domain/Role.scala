@@ -2,7 +2,7 @@ package fi.kimmoeklund.domain
 
 import java.util.UUID
 import zio.json._
-import fi.kimmoeklund.html.ZiamHtml
+import fi.kimmoeklund.html.HtmlEncoder
 
 case class Role(id: UUID, name: String, permissions: Seq[Permission]) 
 

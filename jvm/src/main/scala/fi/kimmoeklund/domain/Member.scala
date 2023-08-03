@@ -5,7 +5,7 @@ import zio.prelude.Validation
 import zio.schema.codec
 
 import java.util.UUID
-import fi.kimmoeklund.html.ZiamHtml
+import fi.kimmoeklund.html.HtmlEncoder
 
 sealed trait Member
 
