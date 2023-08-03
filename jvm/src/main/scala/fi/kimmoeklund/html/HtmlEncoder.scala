@@ -12,7 +12,7 @@ trait HtmlEncoder[A]:
   def wrapValueWith(element: PartialElement, value: A, strModifier: String => String = a => a): List[Dom]
   def wrapParametersWith(element: PartialElement, strModifier: String => String = a => a): List[Dom]
 
-object HtmlEncoder extends AutoDerivation[HtmlEncoder]:
+object HtmlEncoder extends Derivation[HtmlEncoder]:
 
   inline def apply[A](using A: HtmlEncoder[A]): HtmlEncoder[A] = A
 

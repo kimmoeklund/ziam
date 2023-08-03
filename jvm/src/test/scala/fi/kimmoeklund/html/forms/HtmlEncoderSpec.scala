@@ -8,34 +8,38 @@ import fi.kimmoeklund.domain.Organization
 import fi.kimmoeklund.html.wrapWith
 import fi.kimmoeklund.html.HtmlEncoder
 import fi.kimmoeklund.domain.LoginType
+import fi.kimmoeklund.html.pages.UserView
 
 enum TestEnum {
   case Foo
   case Bar
 }
 
+given HtmlEncoder[TestEnum] = HtmlEncoder.derived[TestEnum]
+given HtmlEncoder[LoginType] = HtmlEncoder.derived[LoginType]
+
 object HtmlEncoderSpec extends ZIOSpecDefault:
   override def spec = suite("HtmlEncoder")(
     test("it should wrap User parameters values to <td>") {
-      val user = User(UUID.randomUUID(), "test", Organization(UUID.randomUUID(), "test-org"), Seq(), Seq())
+      val user = UserView(UUID.randomUUID(), "name", "test-org", List(), List())
       assertTrue(
         user
           .wrapWith(td)
           .map(_.encode)
           .mkString(
             ""
-          ) == s"<td>${user.id.toString}</td><td>${user.name}</td><td>${user.organization.id.toString}</td><td>${user.organization.name}</td>"
+          ) == s"<td>${user.id.toString}</td><td>${user.name}</td><td>${user.organization}</td>"
       )
     },
     test("it should wrap User parameter names with <td>") {
-      assertTrue(HtmlEncoder[User].wrapParametersWith(td).map(_.encode).mkString("") == "<td>id</td><td>name</td><td>organization</td><td>roles</td><td>logins</td>")
+      assertTrue(HtmlEncoder[UserView].wrapParametersWith(td).map(_.encode).mkString("") == "<td>id</td><td>name</td><td>organization</td><td>roles</td><td>logins</td>")
     },
     test("it should wrap User parameter names capitalized with <td> ") {
-      val result = HtmlEncoder[User].wrapParametersWith(td, _.capitalize).map(_.encode).mkString("") 
+      val result = HtmlEncoder[UserView].wrapParametersWith(td, _.capitalize).map(_.encode).mkString("") 
       assertTrue(result == "<td>Id</td><td>Name</td><td>Organization</td><td>Roles</td><td>Logins</td>")
     },
     test("it should wrap enum value inside <td>") {
-      assertTrue(LoginType.PasswordCredentials.wrapWith(td).map(_.encode).mkString("") == "<td>PasswordCredentials</td>")
+      assertTrue((LoginType.PasswordCredentials).wrapWith(td).map(_.encode).mkString("") == "<td>PasswordCredentials</td>")
     },
     test("it should wrap enum name inside <td>") {
       val foo = HtmlEncoder[TestEnum].wrapParametersWith(td).map(_.encode).mkString("")
