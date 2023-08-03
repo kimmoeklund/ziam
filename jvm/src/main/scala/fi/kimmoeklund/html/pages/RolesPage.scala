@@ -9,33 +9,22 @@ import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
 import zio.http.{html as _, *}
-
+import io.github.arainko.ducktape.*
 import java.util.UUID
 import scala.util.Try
+import fi.kimmoeklund.html.Identifiable
+import fi.kimmoeklund.html.HtmlEncoder
+import fi.kimmoeklund.html.Htmx
 
-case class RolesPage(path: String, db: String) extends Page[UserRepository] {
-  extension (r: Role) {
-    def htmlTableRow(db: String): Dom = tr(
-      PartialAttribute("hx-target") := "this",
-      PartialAttribute("hx-swap") := "delete",
-      td(r.name),
-      td(r.id.toString),
-      td(r.permissions.map(p => s"${p.target} ${p.permission}").mkString(", ")),
-      td(
-        button(
-          classAttr := "btn btn-danger" :: Nil,
-          "Delete",
-          PartialAttribute("hx-delete") := s"/$db/roles/${r.id}"
-        )
-      )
-    )
+case class RoleView(id: UUID, name: String, permissions: Seq[String]) extends Identifiable
 
-    def htmlTableRowSwap(db: String): Dom =
-      tBody(
-        PartialAttribute("hx-swap-oob") := "beforeend:#roles-table",
-        htmlTableRow(db)
-      )
-  }
+object RoleView:
+  def from(r: Role) = r
+    .into[RoleView]
+    .transform(Field.computed(_.permissions, r => r.permissions.map(p => s"${p.target} (${p.permission})")))
+  given HtmlEncoder[RoleView] = HtmlEncoder.derived[RoleView]
+
+case class RolesPage(htmlId: String, path: String, db: String) extends Page[UserRepository, Role, RoleView] {
 
   private def getRoles = for {
     repo <- ZIO.serviceAt[UserRepository](db)
@@ -44,7 +33,9 @@ case class RolesPage(path: String, db: String) extends Page[UserRepository] {
 
   override def tableList = getRoles.map(roles => htmlTable(roles))
 
-  def post(request: Request) = for {
+  def mapToView = r => RoleView.from(r)
+
+  def post(request: Request) = (for {
     repo <- ZIO.serviceAt[UserRepository](db)
     form <- request.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
     name <- ZIO.fromTry(Try(form.get("name").get.stringValue.get)).orElseFail(MissingInput("name"))
@@ -69,7 +60,7 @@ case class RolesPage(path: String, db: String) extends Page[UserRepository] {
     permissions <- repo.get.getPermissionsById(inputUuids.toList)
     _ <- ZIO.logInfo(inputUuids.mkString(","))
     r <- repo.get.addRole(Role(UUID.randomUUID(), name, permissions))
-  } yield (r).htmlTableRowSwap(db)
+  } yield (mapToView(r))).map(newResourceHtml)
 
   override def delete(id: String) = for {
     repo <- ZIO.serviceAt[UserRepository](db)
@@ -77,50 +68,28 @@ case class RolesPage(path: String, db: String) extends Page[UserRepository] {
     _ <- repo.get.deleteRole(uuid)
   } yield ()
 
-  def htmlTable(roles: List[Role]): Html = {
-    table(
-      classAttr := "table" :: Nil,
-      tHead(
-        tr(
-          th("Role"),
-          th("ID"),
-          th("Permissions")
-        )
+  def newFormRenderer =
+    form(
+      idAttr := "add-role",
+      PartialAttribute("hx-post") := s"roles",
+      PartialAttribute("hx-swap") := "none",
+      div(
+        classAttr := "mb-3" :: Nil,
+        label(
+          "Role name",
+          forAttr := "name-field",
+          classAttr := "form-label" :: Nil
+        ),
+        input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text")
       ),
-      tBody(id := "roles-table", roles.map(_.htmlTableRow(db)))
+      div(
+        classAttr := "mb-3" :: Nil,
+        label("Permissions", classAttr := "form-label" :: Nil, forAttr := "permissions-select"),
+        Htmx.selectOption(s"/${this.db}/permissions/options", "permissions", true)
+      ),
+      button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
     ) ++
-      form(
-        idAttr := "add-role",
-        PartialAttribute("hx-post") := s"roles",
-        PartialAttribute("hx-swap") := "none",
-        div(
-          classAttr := "mb-3" :: Nil,
-          label(
-            "Role name",
-            forAttr := "name-field",
-            classAttr := "form-label" :: Nil
-          ),
-          input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text")
-        ),
-        div(
-          classAttr := "mb-3" :: Nil,
-          label("Permissions", classAttr := "form-label" :: Nil, forAttr := "permissions-select"),
-          select(
-            idAttr := "permissions-select",
-            classAttr := "form-select" :: Nil,
-            multipleAttr := "multiple",
-            nameAttr := "permissions",
-            PartialAttribute("hx-params") := "none",
-            PartialAttribute("hx-get") := s"/$db/permissions/options",
-            PartialAttribute("hx-trigger") := "revealed",
-            PartialAttribute("hx-target") := "#permissions-select",
-            PartialAttribute("hx-swap") := "innerHTML"
-          )
-        ),
-        button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
-      ) ++
       script(srcAttr := "/scripts")
-  }
 
   override def optionsList = getRoles.map(roles => roles.map(r => option(r.name, valueAttr := r.id.toString)))
 }

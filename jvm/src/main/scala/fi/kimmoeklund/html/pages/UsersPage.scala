@@ -2,7 +2,7 @@ package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.domain.FormError.InputValueInvalid
-import fi.kimmoeklund.html.Page
+import fi.kimmoeklund.html.*
 import fi.kimmoeklund.html.forms.*
 import fi.kimmoeklund.service.UserRepository
 import zio.*
@@ -15,28 +15,10 @@ import java.util.UUID
 import fi.kimmoeklund.html.HtmlEncoder
 import fi.kimmoeklund.html.wrapWith
 import io.github.arainko.ducktape.*
+import fi.kimmoeklund.html.Htmx
 
-case class UserView(id: UUID, name: String, organization: String, roles: Seq[Role], logins: Seq[Login]): 
-
-    def htmlTableRow(db: String): Dom =
-      tr(
-        PartialAttribute("hx-target") := "this",
-        PartialAttribute("hx-swap") := "delete",
-        this.wrapWith(td),
-        td(
-          button(
-            classAttr := "btn btn-danger" :: Nil,
-            "Delete",
-            PartialAttribute("hx-delete") := s"/$db/users/${this.id}"
-          )
-        )
-      )
-
-    def htmlTableRowSwap(db: String): Html =
-      tBody(
-        PartialAttribute("hx-swap-oob") := "beforeend:#users-table",
-        htmlTableRow(db)
-      )
+case class UserView(id: UUID, name: String, organization: String, roles: Seq[Role], logins: Seq[Login])
+    extends Identifiable
 
 object UserView:
   def from(u: User) = u.into[UserView].transform(Field.computed(_.organization, u => u.organization.name))
@@ -45,76 +27,50 @@ object UserView:
   given HtmlEncoder[Role] = HtmlEncoder.derived[Role]
   given HtmlEncoder[UserView] = HtmlEncoder.derived[UserView]
 
-case class UsersPage(path: String, db: String) extends Page[UserRepository] {
+case class UsersPage(htmlId: String, path: String, db: String) extends Page[UserRepository, User, UserView]:
 
-  def htmlTable(args: List[User]): Html =
-    table(
-      classAttr := "table" :: Nil,
-      tHead(
-        tr(
-          HtmlEncoder[UserView].wrapParametersWith(th, _.capitalize)
-        )
-      ),
-      tBody(id := "users-table", args.map(u => UserView.from(u).htmlTableRow(db)))
-    ) ++ form(
-      idAttr := "add-users-form",
-      PartialAttribute("hx-post") := s"/$db/users",
-      PartialAttribute("hx-swap") := "none",
-      label(
-        "Name",
-        forAttr := "name-field",
-        classAttr := "form-label" :: Nil
-      ),
-      input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text"),
-      label("Username", classAttr := "form-label" :: Nil, forAttr := "username-field"),
-      input(id := "username-field", nameAttr := "username", classAttr := "form-control" :: Nil, typeAttr := "text"),
-      label("Organization", classAttr := "form-label" :: Nil, forAttr := "organization-select"),
-      select(
-        idAttr := "organization-select",
-        classAttr := "form-select" :: Nil,
-        nameAttr := "organization",
-        PartialAttribute("hx-get") := s"/$db/organizations/options",
-        PartialAttribute("hx-trigger") := "revealed",
-        PartialAttribute("hx-params") := "none",
-        PartialAttribute("hx-target") := "#organization-select",
-        PartialAttribute("hx-swap") := "innerHTML"
-      ),
-      label("Roles", classAttr := "form-label" :: Nil, forAttr := "roles-select"),
-      select(
-        idAttr := "roles-select",
-        multipleAttr := "multiple",
-        classAttr := "form-select" :: Nil,
-        nameAttr := "roles",
-        PartialAttribute("hx-get") := s"/$db/roles/options",
-        PartialAttribute("hx-trigger") := "revealed",
-        PartialAttribute("hx-params") := "none",
-        PartialAttribute("hx-target") := "#roles-select",
-        PartialAttribute("hx-swap") := "innerHTML"
-      ),
-      label(
-        "Password",
-        classAttr := "form-label" :: Nil,
-        forAttr := "password-field"
-      ),
-      input(
-        id := "password-field",
-        nameAttr := "password",
-        classAttr := "form-control" :: Nil,
-        typeAttr := "password"
-      ),
-      input(
-        id := "password-confirmation",
-        nameAttr := "password-confirmation",
-        classAttr := "form-control" :: Nil,
-        typeAttr := "password"
-      ),
-      button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add") ++
-        script(srcAttr := "/scripts")
-    )
+  def mapToView = UserView.from(_)
+
+  def newFormRenderer = form(
+    idAttr := "add-users-form",
+    PartialAttribute("hx-post") := s"/$db/users",
+    PartialAttribute("hx-swap") := "none",
+    label(
+      "Name",
+      forAttr := "name-field",
+      classAttr := "form-label" :: Nil
+    ),
+    input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text"),
+    label("Username", classAttr := "form-label" :: Nil, forAttr := "username-field"),
+    input(id := "username-field", nameAttr := "username", classAttr := "form-control" :: Nil, typeAttr := "text"),
+    label("Organization", classAttr := "form-label" :: Nil, forAttr := "organization-select"),
+    Htmx.selectOption(s"/${this.db}/organizations/options", "organization", true),
+    label("Roles", classAttr := "form-label" :: Nil, forAttr := "roles-select"),
+    Htmx.selectOption(s"/${this.db}/roles/options", "roles"),
+    label(
+      "Password",
+      classAttr := "form-label" :: Nil,
+      forAttr := "password-field"
+    ),
+    input(
+      id := "password-field",
+      nameAttr := "password",
+      classAttr := "form-control" :: Nil,
+      typeAttr := "password"
+    ),
+    input(
+      id := "password-confirmation",
+      nameAttr := "password-confirmation",
+      classAttr := "form-control" :: Nil,
+      typeAttr := "password"
+    ),
+    button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add") ++
+      script(srcAttr := "/scripts")
+  )
 
   def post(req: Request) = {
     val userId = UUID.randomUUID()
-    for {
+    (for {
       repo <- ZIO.serviceAt[UserRepository](db)
       form <- req.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
       newUserForm <- NewUserForm
@@ -133,7 +89,7 @@ case class UsersPage(path: String, db: String) extends Page[UserRepository] {
       user <- repo.get.addUser(
         NewPasswordUser(userId, newUserForm.name, orgAndRoles._1, newUserForm.credentials, orgAndRoles._2)
       )
-    } yield (UserView.from(user)).htmlTableRowSwap(db)
+    } yield (mapToView(user))).map(newResourceHtml)
   }
 
   override def delete(id: String): ZIO[Map[String, UserRepository], ErrorCode, Unit] = {
@@ -150,5 +106,3 @@ case class UsersPage(path: String, db: String) extends Page[UserRepository] {
     repo <- ZIO.serviceAt[UserRepository](db)
     users <- repo.get.getUsers
   } yield htmlTable(users)
-
-}

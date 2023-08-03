@@ -12,39 +12,17 @@ import zio.http.{html as _, *}
 
 import java.util.UUID
 import scala.util.Try
-case class PermissionsPage(path: String, db: String) extends Page[UserRepository] {
-
-  extension (p: Permission) {
-    def htmlTableRow(db: String): Dom = tr(
-      PartialAttribute("hx-target") := "this",
-      PartialAttribute("hx-swap") := "delete",
-      td(p.target),
-      td(p.permission.toString),
-      td(
-        button(
-          classAttr := "btn btn-danger" :: Nil,
-          "Delete",
-          PartialAttribute("hx-delete") := s"/$db/permissions/${p.id}"
-        )
-      )
-    )
-
-    def htmlTableRowSwap(db: String): Dom =
-      tBody(
-        PartialAttribute("hx-swap-oob") := "beforeend:#permissions-table",
-        htmlTableRow(db)
-      )
-  }
-
+case class PermissionsPage(htmlId: String, path: String, db: String) extends Page[UserRepository, Permission, Permission] {
 
   private def getPermissions = for {
     repo <- ZIO.serviceAt[UserRepository](db)
     permissions <- repo.get.getPermissions
   } yield permissions
 
+  def mapToView = p => p
   override def tableList = getPermissions.map(permissions => htmlTable(permissions))
 
-  def post(request: Request) = for {
+  def post(request: Request) = (for {
     repo <- ZIO.serviceAt[UserRepository](db)
     form <- request.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
     target <- ZIO.fromTry(Try(form.get("target").get.stringValue.get)).orElseFail(MissingInput("target"))
@@ -53,7 +31,7 @@ case class PermissionsPage(path: String, db: String) extends Page[UserRepository
       .fromTry(Try(permission.toInt))
       .orElseFail(InputValueInvalid("permission", "unable to parse to integer"))
     p <- repo.get.addPermission(Permission(UUID.randomUUID(), target, permissionInt))
-  } yield (p).htmlTableRowSwap(db)
+  } yield (p)).map(newResourceHtml)
 
   override def delete(id: String) = for {
     repo <- ZIO.serviceAt[UserRepository](db)
@@ -73,38 +51,27 @@ case class PermissionsPage(path: String, db: String) extends Page[UserRepository
     )
   })
 
-  def htmlTable(permissions: List[Permission]): Html = {
-    table(
-      classAttr := "table" :: Nil,
-      tHead(
-        tr(
-          th("Target"),
-          th("Permission")
+  def newFormRenderer = 
+    form(
+      idAttr := "add-permission",
+      PartialAttribute("hx-post") := s"/$db/permissions",
+      PartialAttribute("hx-swap") := "none",
+      label(
+        "Target",
+        forAttr := "target",
+        input(idAttr := "target", nameAttr := "target", classAttr := "form-control" :: Nil, typeAttr := "text")
+      ),
+      label(
+        "Permission",
+        forAttr := "permission",
+        input(
+          id := "permission",
+          nameAttr := "permission",
+          classAttr := "form-control" :: Nil,
+          typeAttr := "text"
         )
       ),
-      tBody(id := "permissions-table", permissions.map(_.htmlTableRow(db)))
+      button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
     ) ++
-      form(
-        idAttr := "add-permission",
-        PartialAttribute("hx-post") := s"/$db/permissions",
-        PartialAttribute("hx-swap") := "none",
-        label(
-          "Target",
-          forAttr := "target",
-          input(idAttr := "target", nameAttr := "target", classAttr := "form-control" :: Nil, typeAttr := "text")
-        ),
-        label(
-          "Permission",
-          forAttr := "permission",
-          input(
-            id := "permission",
-            nameAttr := "permission",
-            classAttr := "form-control" :: Nil,
-            typeAttr := "text"
-          )
-        ),
-        button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
-      ) ++
-      script(srcAttr := "/scripts")
-  }
+    script(srcAttr := "/scripts")
 }

@@ -10,7 +10,6 @@ import zio.prelude.Validation
 def htmxHead: Dom = {
   head(
     Html.fromString("""<meta name="htmx-config" content='{"useTemplateFragments":true}'>"""),
-    //        meta(nameAttr := "htmx-config", contentAttr := "{\"useTemplateFragments\":\"true\"}"),
     title("Permissions"),
     link(
       relAttr := "stylesheet",
@@ -26,21 +25,9 @@ def htmxHead: Dom = {
   )
 }
 
-def htmlSnippet(data: Html, status: Status = Status.Ok): Response = {
+def htmlSnippet(data: Html, status: Status = Status.Ok): Response = 
   Response(
     status,
     Headers(Header.ContentType(MediaType.text.html).untyped),
     Body.fromCharSequence(data.encode)
   )
-}
-
-// Option[field] => validation string or validation UUID
-
-//extension(form: Form):
-//  def validate[A](fields: String*): Validation[ErrorCode, A] =
-//    fields.collect(f => {
-//      val value = this.get(f)      
-//    })
-//  
-    
-  

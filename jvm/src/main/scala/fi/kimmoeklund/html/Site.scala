@@ -10,13 +10,13 @@ import zio.http.{html as _, *}
 case class Site[-R <: PageService](
     db: String,
     tabMenu: TabMenu,
-    pages: List[Page[R]]
+    pages: List[Page[R, _, _]]
 ) {
 
   private def getPage(path: String) = // ZIO.succeed(pages.head)
     ZIO.fromOption(pages.find(f => f.path == path)).orElseFail(Response.status(Status.NotFound))
 
-  private def setActive(page: Page[R]) = tabMenu.setActiveTab(Root / db / page.path)
+  private def setActive(page: Page[R, _, _]) = tabMenu.setActiveTab(Root / db / page.path)
 
   def htmlValue(page: Html): Html =
     html(htmxHead ++ body(div(classAttr := "container" :: Nil, tabMenu.htmlValue, page)))
@@ -82,10 +82,10 @@ case class Site[-R <: PageService](
 object Site {
   def build(db: String) = {
     val pages = List(
-      UsersPage("users", db),
-      OrganizationsPage("organizations", db),
-      RolesPage("roles", db),
-      PermissionsPage("permissions", db)
+      UsersPage("users", "users", db),
+      OrganizationsPage("organizations", "organizations", db),
+      RolesPage("roles", "roles", db),
+      PermissionsPage("permissions", "permissions", db)
     )
     val tabs = pages.map(p => Tab(p.path.capitalize, Root / db / p.path, false))
     Site(db, TabMenu(tabs), pages)
