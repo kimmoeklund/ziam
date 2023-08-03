@@ -247,9 +247,8 @@ final class UserRepositoryLive(
         pg <- query[PermissionGrants].leftJoin(pg => roles.id == pg.roleId)
         p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
       } yield (roles, pg, p)
-    }.tapBoth((e: Throwable) => ZIO.logError(e.toString), r => ZIO.logInfo(s"fetched roles: $r"))
-      .fold(
-        _ => List(),
+    }.mapBoth(
+        e => GeneralErrors.Exception(e.getMessage),
         list => mapRoles(list)
       )
   }
