@@ -1,18 +1,26 @@
 package fi.kimmoeklund.ziam
 
 import com.outr.scalapass.Argon2PasswordFactory
-import fi.kimmoeklund.html.Site
+import fi.kimmoeklund.html.{Site, SiteService}
 import fi.kimmoeklund.service.*
 import io.getquill.{Escape, SnakeCase}
 import zio.*
 import zio.http.*
-import zio.http.HttpAppMiddleware.{addCookie, basicAuthZIO, signCookies, whenRequestZIO, whenStatus, customAuthZIO, redirect}
+import zio.http.HttpAppMiddleware.{
+  addCookie,
+  basicAuthZIO,
+  signCookies,
+  whenRequestZIO,
+  whenStatus,
+  customAuthZIO,
+  redirect
+}
 import zio.logging.backend.SLF4J
 import zio.metrics.*
 
 import java.io.File
 import java.time.Duration
-import fi.kimmoeklund.html.pages.LoginPage
+import fi.kimmoeklund.html.pages.DefaultLoginPage
 
 object Main extends ZIOAppDefault:
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
@@ -21,7 +29,8 @@ object Main extends ZIOAppDefault:
   // todo: reactor to ZIO-config
   private val cookieSecret = "mysecret"
   private val authCookie = Cookie.Response("ziam", "", None, Some(Root), false, true).sign(cookieSecret)
-  private val logoutCookie = Cookie.Response("ziam", "", None, Some(Root), false, true, Some(Duration.ZERO)).sign(cookieSecret)
+  private val logoutCookie =
+    Cookie.Response("ziam", "", None, Some(Root), false, true, Some(Duration.ZERO)).sign(cookieSecret)
   private val invalidCookie =
     (request: Request) => {
       val cookie =
@@ -35,21 +44,30 @@ object Main extends ZIOAppDefault:
     case Method.GET -> Root => Handler.response(Response.redirect(URL(Root / "ziam" / "users"))).toHttp
   }
 
-  val site = Site.build("ziam")
-  val loginPage = LoginPage("login", "logout", "ziam", authCookie, logoutCookie)
-  val httpApps = loginPage.loginApp ++ 
-    (scriptsAndMainPage.withDefaultErrorResponse ++ site.httpValue) @@ whenRequestZIO(invalidCookie)(
-      redirect(URL(Root / "ziam" / "login"), false)
-    ) ++ ZiamApi() 
+
+  val siteService = for {
+    dbMgmt <- ZIO.service[DbManagement]
+    sites <- dbMgmt.buildSites
+  } yield (SiteService(sites, authCookie, logoutCookie).asInstanceOf[SiteService[UserRepository]])
+  //TODO can we get rid of the user repository for site service
 
   def run = {
-    Server
+    (siteService.provide(DbManagementLive.live).orDie).flatMap(siteService => {
+      val databases = siteService.sites.map(_.db) 
+      val httpApps =
+      siteService.loginApp ++
+        (scriptsAndMainPage.withDefaultErrorResponse ++ siteService.contentApp) @@ whenRequestZIO(invalidCookie)(
+          redirect(URL(Root / "ziam" / "login"), false) // TODO fix the redirect (how ??), cookies should db specific
+        ) ++ ZiamApi()
+
+      Server
       .serve(httpApps)
       .provide(
         Server.default,
         Argon2.passwordFactory,
-        DataSourceLayer.quill("ziam"),
-        DataSourceLayer.sqlite("ziam"),
-        UserRepositoryLive.sqliteLayer("ziam")
+        DataSourceLayer.quill(databases),
+        DataSourceLayer.sqlite(databases),
+        UserRepositoryLive.sqliteLayer(databases),
       )
+    })
   }

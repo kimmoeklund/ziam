@@ -49,10 +49,10 @@ object Cli extends ZIOCliDefault {
         )
       )
     } yield ()).provide(
-      DataSourceLayer.sqlite(name),
-      DataSourceLayer.quill(name),
+      DataSourceLayer.sqlite(Vector(name)),
+      DataSourceLayer.quill(Vector(name)),
       Argon2.passwordFactory,
-      UserRepositoryLive.sqliteLayer(name),
+      UserRepositoryLive.sqliteLayer(Vector(name)),
       DbManagementLive.live
     )
   }

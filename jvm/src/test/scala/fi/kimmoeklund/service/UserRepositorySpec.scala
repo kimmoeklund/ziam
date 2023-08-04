@@ -25,7 +25,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
   val unicodeString =
     Gen.stringBounded(5, 100)(Gen.unicodeChar.filter(c => c != 0x00.toChar && !c.isControl && !c.isWhitespace))
   val asciiString = Gen.stringBounded(3, 12)(Gen.alphaNumericChar)
-  val envKey = "unittest"
+  val envKeys = Vector("unittest")
 
   def fetchUsers: ZIO[ZState[TestScenario] & Map[String, UserRepository], ErrorCode, List[
     Spec[Any, Nothing]
@@ -161,11 +161,11 @@ object UserRepositorySpec extends ZIOSpecDefault:
       + suite("fetch users")(fetchUsers))
       .provideShared(
         ZState.initial(TestScenario.create),
-        DataSourceLayer.sqlite(envKey),
-        DataSourceLayer.quill(envKey),
-        UserRepositoryLive.sqliteLayer(envKey),
+        DataSourceLayer.sqlite(envKeys),
+        DataSourceLayer.quill(envKeys),
+        UserRepositoryLive.sqliteLayer(envKeys),
         Argon2.passwordFactory
       ) @@ sequential @@ samples(1) @@ nondeterministic @@ beforeAll {
-      DbManagement.provisionDatabase(envKey).provide(DbManagementLive.live)
+      DbManagement.provisionDatabase(envKeys(0)).provide(DbManagementLive.live)
     }
   }
