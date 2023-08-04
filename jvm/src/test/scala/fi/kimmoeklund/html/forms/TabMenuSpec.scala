@@ -9,7 +9,7 @@ import io.getquill.util.testLoad
 val tabMenu = TabMenu(List(Tab("test", Root / "test", false), Tab("test2", Root / "test2", false)))
 
 object TabMenuSpec extends ZIOSpecDefault {
-  override def spec = suite("TabMenuSpec")(
+  override def spec = suite("TabMenu")(
     test("it should set tab active") {
       val menu = tabMenu.copy()
       menu.setActiveTab(Root / "test2")
