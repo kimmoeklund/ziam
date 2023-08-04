@@ -27,13 +27,13 @@ object UserView:
   given HtmlEncoder[Role] = HtmlEncoder.derived[Role]
   given HtmlEncoder[UserView] = HtmlEncoder.derived[UserView]
 
-case class UsersPage(htmlId: String, path: String, db: String) extends Page[UserRepository, User, UserView]:
-
+case class UsersPage(path: String, db: String) extends Page[UserRepository, User, UserView]:
+  val htmlId = path
   def mapToView = UserView.from(_)
 
   def newFormRenderer = form(
     idAttr := "add-users-form",
-    PartialAttribute("hx-post") := s"/$db/users",
+    PartialAttribute("hx-post") := s"/$db/$path",
     PartialAttribute("hx-swap") := "none",
     label(
       "Name",

@@ -13,8 +13,10 @@ import java.util.UUID
 import scala.util.Try
 import fi.kimmoeklund.html.HtmlEncoder
 
-case class OrganizationsPage(val htmlId: String, path: String, db: String) extends Page[UserRepository, Organization, Organization] {
+case class OrganizationsPage(path: String, db: String) extends Page[UserRepository, Organization, Organization] {
   import FormError.*
+
+  val htmlId = path
 
   private def getOrganizations = for {
     repo <- ZIO.serviceAt[UserRepository](db)
