@@ -17,16 +17,9 @@ trait Menu extends StaticHtml:
 trait MenuItem extends StaticHtml:
   val path: Path
 
-case class ActiveTab(name: String, path: Path) extends MenuItem:
-  def htmlValue: Html =
-    li(
-      classAttr := "nav" :: "nav-item" :: Nil,
-      a(classAttr := "nav-link" :: "active" :: Nil, href := path.toString, name)
-    )
-
 case class Tab(name: String, path: Path, var active: Boolean) extends MenuItem:
   def htmlValue: Html =
-    li(classAttr := "nav" :: "nav-item" :: Nil, a(classAttr := "nav-link" :: Nil, href := path.toString, name))
+    li(classAttr := "nav" :: "nav-item" :: Nil, a(classAttr := "nav-link" :: (if (active) then "active" :: Nil else Nil), href := path.toString, name))
 
 case class TabMenu(items: List[Tab]) extends Menu:
   def htmlValue: Html = ul(classAttr := "nav" :: "nav-tabs" :: Nil, items.map(_.htmlValue).reduce(_ ++ _))
