@@ -13,7 +13,7 @@ case class Site[-R <: PageService](
     pages: List[Page[R, _, _]]
 ) {
 
-  private def getPage(path: String) = // ZIO.succeed(pages.head)
+  private def getPage(path: String) = 
     ZIO.fromOption(pages.find(f => f.path == path)).orElseFail(Response.status(Status.NotFound))
 
   private def setActive(page: Page[R, _, _]) = tabMenu.setActiveTab(Root / db / page.path)
@@ -38,6 +38,7 @@ case class Site[-R <: PageService](
 
     case Method.GET -> Root / this.db / path =>
       getPage(path).flatMap(page =>
+        setActive(page)  
         page.tableList.foldZIO(
           e => {
             for {
@@ -82,10 +83,10 @@ case class Site[-R <: PageService](
 object Site {
   def build(db: String) = {
     val pages = List(
-      UsersPage("users", "users", db),
-      OrganizationsPage("organizations", "organizations", db),
-      RolesPage("roles", "roles", db),
-      PermissionsPage("permissions", "permissions", db)
+      UsersPage("users", db),
+      OrganizationsPage("organizations", db),
+      RolesPage("roles", db),
+      PermissionsPage("permissions", db)
     )
     val tabs = pages.map(p => Tab(p.path.capitalize, Root / db / p.path, false))
     Site(db, TabMenu(tabs), pages)

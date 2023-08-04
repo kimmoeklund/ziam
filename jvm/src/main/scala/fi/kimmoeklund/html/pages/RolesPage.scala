@@ -24,8 +24,8 @@ object RoleView:
     .transform(Field.computed(_.permissions, r => r.permissions.map(p => s"${p.target} (${p.permission})")))
   given HtmlEncoder[RoleView] = HtmlEncoder.derived[RoleView]
 
-case class RolesPage(htmlId: String, path: String, db: String) extends Page[UserRepository, Role, RoleView] {
-
+case class RolesPage(path: String, db: String) extends Page[UserRepository, Role, RoleView] {
+  val htmlId = path
   private def getRoles = for {
     repo <- ZIO.serviceAt[UserRepository](db)
     orgs <- repo.get.getRoles

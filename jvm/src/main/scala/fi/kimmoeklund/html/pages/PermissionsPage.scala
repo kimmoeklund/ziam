@@ -12,7 +12,10 @@ import zio.http.{html as _, *}
 
 import java.util.UUID
 import scala.util.Try
-case class PermissionsPage(htmlId: String, path: String, db: String) extends Page[UserRepository, Permission, Permission] {
+
+case class PermissionsPage(path: String, db: String) extends Page[UserRepository, Permission, Permission] {
+
+  val htmlId = path
 
   private def getPermissions = for {
     repo <- ZIO.serviceAt[UserRepository](db)
@@ -54,7 +57,7 @@ case class PermissionsPage(htmlId: String, path: String, db: String) extends Pag
   def newFormRenderer = 
     form(
       idAttr := "add-permission",
-      PartialAttribute("hx-post") := s"/$db/permissions",
+      PartialAttribute("hx-post") := s"/$db/$path",
       PartialAttribute("hx-swap") := "none",
       label(
         "Target",
