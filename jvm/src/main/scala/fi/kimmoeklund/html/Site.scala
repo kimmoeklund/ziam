@@ -10,22 +10,60 @@ import zio.http.{html as _, *}
 case class Site[-R <: PageService](
     db: String,
     tabMenu: TabMenu,
-    pages: List[Page[R, _, _]]
+    pages: List[Page[R, _, _]],
+    loginPage: LoginPage[R, _]
+)
+
+final case class SiteService[R <: PageService](
+    sites: Seq[Site[R]],
+    authCookie: Cookie.Response,
+    logoutCookie: Cookie.Response
 ) {
 
-  private def getPage(path: String) = 
-    ZIO.fromOption(pages.find(f => f.path == path)).orElseFail(Response.status(Status.NotFound))
+  private def getPage(path: String, db: String) =
+    ZIO
+      .fromOption(for {
+        site <- sites.find(s => s.db == db)
+        page <- site.pages.find(f => f.path == path)
+      } yield (site, page))
+      .orElseFail(Response.status(Status.NotFound))
 
-  private def setActive(page: Page[R, _, _]) = tabMenu.setActiveTab(Root / db / page.path)
+  private def siteWithLoginPage(db: String, path: String) = for {
+    site <- sites.find(s => s.db == db)
+    page <- if site.loginPage.loginPath == path then Some(site.loginPage) else None //
+  } yield (site)
 
-  def htmlValue(page: Html): Html =
-    html(htmxHead ++ body(div(classAttr := "container" :: Nil, tabMenu.htmlValue, page)))
+  private def setActive(site: Site[R], page: Page[R, _, _]) = site.tabMenu.setActiveTab(Root / site.db / page.path)
 
-  def httpValue: App[Map[String, R]] = Http.collectZIO[Request] {
-    case request @ Method.GET -> Root / this.db / path / format =>
+  def htmlValue(site: Site[R], page: Html): Html = html(
+    htmxHead ++ body(div(classAttr := "container" :: Nil, site.tabMenu.htmlValue, page))
+  )
+
+  def loginApp: App[Map[String, R]] = Http.collectZIO[Request] {
+    case request @ Method.GET -> Root / db / path if siteWithLoginPage(db, path).isDefined => {
+      val site = siteWithLoginPage(db, path).get
+      site.loginPage
+        .doLogin(request)
+        .mapBoth(
+          _ => Response.html(site.loginPage.showLogin),
+          _ => Response.seeOther(URL(Root / db / "users")).addCookie(authCookie)
+        )
+
+    }
+  } // TODO POST LOGIN ja LOGOUT
+
+//    case request @ Method.POST -> Root / db / path => getLoginPage(db, path).flatMap { site =>
+//        _ => ZIO.succeed(Response.html(site.loginPage.showLogin)),
+//        _ => ZIO.succeed(Response.seeOther(URL(Root / db / "users")).addCookie(authCookie))
+//
+//    case Method.GET -> Root / db / this.logoutPath => ZIO.succeed(Response.html(showLogin).addCookie(logoutCookie))
+//  }
+//
+  def contentApp: App[Map[String, R]] = Http.collectZIO[Request] {
+    case request @ Method.GET -> Root / db / path / format =>
       format match {
         case "options" =>
-          getPage(path).flatMap(page =>
+          getPage(path, db).flatMap((site, page) =>
             page.optionsList
               .mapBoth(
                 e => Response.text(e.toString).withStatus(Status.InternalServerError),
@@ -36,9 +74,9 @@ case class Site[-R <: PageService](
         case _ => ZIO.succeed(Response.status(Status.UnsupportedMediaType))
       }
 
-    case Method.GET -> Root / this.db / path =>
-      getPage(path).flatMap(page =>
-        setActive(page)  
+    case Method.GET -> Root / db / path =>
+      getPage(path, db).flatMap((site, page) =>
+        setActive(site, page)
         page.tableList.foldZIO(
           e => {
             for {
@@ -46,12 +84,12 @@ case class Site[-R <: PageService](
               response <- ZIO.succeed(Response.text(e.toString).withStatus(Status.InternalServerError))
             } yield response
           },
-          (result: Html) => ZIO.succeed(Response.html(htmlValue(result)))
+          (result: Html) => ZIO.succeed(Response.html(htmlValue(site, result)))
         )
       )
 
-    case req @ Method.POST -> Root / this.db / path =>
-      getPage(path).flatMap(page =>
+    case req @ Method.POST -> Root / db / path =>
+      getPage(path, db).flatMap((site, page) =>
         page
           .post(req)
           .foldCauseZIO(
@@ -71,8 +109,8 @@ case class Site[-R <: PageService](
           )
       )
 
-    case Method.DELETE -> Root / this.db / path / id =>
-      getPage(path).flatMap(page =>
+    case Method.DELETE -> Root / db / path / id =>
+      getPage(path, db).flatMap((site, page) =>
         page
           .delete(id)
           .foldZIO(_ => ZIO.succeed(Response.status(Status.BadRequest)), _ => ZIO.succeed(Response.status(Status.Ok)))
@@ -82,6 +120,7 @@ case class Site[-R <: PageService](
 
 object Site {
   def build(db: String) = {
+    println("build site: " + db)
     val pages = List(
       UsersPage("users", db),
       OrganizationsPage("organizations", db),
@@ -89,6 +128,6 @@ object Site {
       PermissionsPage("permissions", db)
     )
     val tabs = pages.map(p => Tab(p.path.capitalize, Root / db / p.path, false))
-    Site(db, TabMenu(tabs), pages)
+    Site(db, TabMenu(tabs), pages, DefaultLoginPage("login", "logout", db))
   }
 }

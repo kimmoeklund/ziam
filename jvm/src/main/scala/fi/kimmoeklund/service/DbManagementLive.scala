@@ -1,5 +1,7 @@
 package fi.kimmoeklund.service
 import zio.*
+import java.io.FilenameFilter
+import fi.kimmoeklund.html.Site
 
 final class DbManagementLive extends DbManagement:
   override def provisionDatabase(dbName: String): IO[DbManagementError, Unit] =
@@ -17,10 +19,19 @@ final class DbManagementLive extends DbManagement:
         val stmt = conn.createStatement()
         val rs = stmt.executeUpdate(schema)
       })
-      _ <- ZIO.logInfo("schema created")
     } yield ()).mapError({ case e: Throwable =>
-      DbManagementError.IOError
+      DbManagementError.IOError(e.getMessage())
     })
+
+  override def buildSites =
+    (for {
+      config <- ZIO.config(DbConfig.config)
+      files <- ZIO.attemptBlockingIO({
+        val file = new java.io.File(s"${config.dbLocation}")
+        file.listFiles((dir: java.io.File, name: String) => name.endsWith(".db")).map(_.getName().replace(".db", ""))
+      })
+      _ <- ZIO.logInfo(s"building sites ${files.toList.map(s => s.toString)}")
+    } yield files.map(Site.build(_)).toSeq)
 
 object DbManagementLive {
   def live = ZLayer.scoped {

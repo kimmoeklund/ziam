@@ -8,6 +8,8 @@ import zio.json.*
 import zio.metrics.*
 
 import scala.util.Try
+import fi.kimmoeklund.service.DataSourceLayer
+import fi.kimmoeklund.service.UserRepositoryLive
 
 object ZiamApi:
   def apply() = Http.collectZIO[Request] {
@@ -25,6 +27,16 @@ object ZiamApi:
         user => ZIO.succeed(Response.json(user.toJson))
       )
 
+//TODO API for adding site
+//    case request @ Method.POST -> Root / "api" / "sites" =>
+//      ZIO.environment.flatMap { env =>
+//        {
+//          env ++ DataSourceLayer.sqlite("newsite")
+//          env ++ DataSourceLayer.quill("newsite")
+////          env.add(UserRepositoryLive.sqliteLayer("newsite"))
+//        }
+//      }
+//
     case Method.GET -> Root / "api" / "auth" =>
       ZIO.succeed(Response.status(Status.Unauthorized))
 

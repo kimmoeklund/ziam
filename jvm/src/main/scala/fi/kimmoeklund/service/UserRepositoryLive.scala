@@ -248,9 +248,9 @@ final class UserRepositoryLive(
         p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
       } yield (roles, pg, p)
     }.mapBoth(
-        e => GeneralErrors.Exception(e.getMessage),
-        list => mapRoles(list)
-      )
+      e => GeneralErrors.Exception(e.getMessage),
+      list => mapRoles(list)
+    )
   }
 
   override def getRolesByIds(ids: Seq[UUID]): IO[ErrorCode, List[Role]] = run {
@@ -309,14 +309,17 @@ object UserRepositoryLive:
 //    } yield UserRepositoryLive(quill, argon2Factory)
 //  }
 
-  def sqliteLayer(key: String): ZLayer[
+  def sqliteLayer(keys: Seq[String]): ZLayer[
     Map[String, Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]] & Argon2PasswordFactory,
     Nothing,
     Map[String, UserRepository]
-  ] =
-    ZLayer(
+  ] = {
+    val repos = ZIO.foreach(keys) { key =>
       for {
         quill <- ZIO.serviceAt[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]](key)
         argon2Factory <- ZIO.service[Argon2PasswordFactory]
-      } yield Map(key -> UserRepositoryLive(quill.get, argon2Factory).asInstanceOf[UserRepository])
-    )
+      } yield (key, UserRepositoryLive(quill.get, argon2Factory).asInstanceOf[UserRepository])
+    }.map(t => ZEnvironment(t.toMap))
+    ZLayer.fromZIOEnvironment(repos)
+  }
+    

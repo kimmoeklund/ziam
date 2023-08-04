@@ -10,35 +10,37 @@ import javax.sql.DataSource
 
 object DataSourceLayer {
 
-  def sqlite(key: String) = {
-    val dataSource = for {
-      config <- ZIO.config(DbConfig.config)
-      foo <- ZIO.succeed({
-        val ds = SQLiteDataSource()
-        ds.setUrl(s"jdbc:sqlite:${config.dbLocation}/${key}.db")
-        ds.asInstanceOf[DataSource]
-      })
-    } yield (
-      ZEnvironment(
-        Map(
-          key -> foo
-        )
-      )
-    )
+  def sqlite(keys: Seq[String]) = {
+    val dataSource = ZIO.foreach(keys) { key =>
+      for {
+        config <- ZIO.config(DbConfig.config)
+        ds <- ZIO.succeed({
+          val ds = SQLiteDataSource()
+          ds.setUrl(s"jdbc:sqlite:${config.dbLocation}/${key}.db")
+          ds.asInstanceOf[DataSource]
+        })
+      } yield (key, ds) }.map(t => ZEnvironment(t.toMap))
     ZLayer.fromZIOEnvironment(dataSource)
   }
 
   def quill(
-      path: String
+      paths: Seq[String]
   ): ZLayer[
     Map[String, DataSource],
     Nothing,
     Map[String, Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]]
   ] = {
-    val quill = for {
-      ds <- ZIO.serviceAt[DataSource](path)
-      quill <- ZIO.succeed(Sqlite(NamingStrategy(SnakeCase, Escape), ds.get))
-    } yield (ZEnvironment(Map(path -> quill.asInstanceOf[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]])))
-    ZLayer.fromZIOEnvironment(quill)
+    val env = ZIO
+      .foreach(paths) { p =>
+        for {
+          ds <- ZIO.serviceAt[DataSource](p)
+          quill <- ZIO.succeed(Sqlite(NamingStrategy(SnakeCase, Escape), ds.get))
+        } yield (p, quill.asInstanceOf[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]])
+      }
+      .map(t => (ZEnvironment(t.toMap)))
+    ZLayer.fromZIOEnvironment(env)
   }
+
+//      ZEnvironment((path -> )))
+//    ZLayer.fromZIOEnvironment(quill)
 }
