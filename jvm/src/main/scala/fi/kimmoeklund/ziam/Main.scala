@@ -55,10 +55,10 @@ object Main extends ZIOAppDefault:
     (siteService.provide(DbManagementLive.live).orDie).flatMap(siteService => {
       val databases = siteService.sites.map(_.db) 
       val httpApps =
-      siteService.loginApp ++
+      ZiamApi() ++ siteService.loginApp ++
         (scriptsAndMainPage.withDefaultErrorResponse ++ siteService.contentApp) @@ whenRequestZIO(invalidCookie)(
           redirect(URL(Root / "ziam" / "login"), false) // TODO fix the redirect (how ??), cookies should db specific
-        ) ++ ZiamApi()
+        ) 
 
       Server
       .serve(httpApps)
