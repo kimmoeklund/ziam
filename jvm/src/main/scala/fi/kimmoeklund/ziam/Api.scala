@@ -14,9 +14,9 @@ import fi.kimmoeklund.service.UserRepositoryLive
 object ZiamApi:
   def apply() = Http.collectZIO[Request] {
 
-    case request @ Method.POST -> Root / "api" / "auth" =>
+    case request @ Method.POST -> Root / "api" / db / "auth" =>
       val effect = for {
-        repo <- ZIO.serviceAt[UserRepository]("ziam")
+        repo <- ZIO.serviceAt[UserRepository](db)
         form <- request.body.asURLEncodedForm.orElseFail(InputValueInvalid("body", "unable to parse as form"))
         userName <- ZIO.fromTry(Try(form.get("username").get.stringValue.get))
         password <- ZIO.fromTry(Try(form.get("password").get.stringValue.get))
@@ -27,16 +27,6 @@ object ZiamApi:
         user => ZIO.succeed(Response.json(user.toJson))
       )
 
-//TODO API for adding site
-//    case request @ Method.POST -> Root / "api" / "sites" =>
-//      ZIO.environment.flatMap { env =>
-//        {
-//          env ++ DataSourceLayer.sqlite("newsite")
-//          env ++ DataSourceLayer.quill("newsite")
-////          env.add(UserRepositoryLive.sqliteLayer("newsite"))
-//        }
-//      }
-//
     case Method.GET -> Root / "api" / "auth" =>
       ZIO.succeed(Response.status(Status.Unauthorized))
 
