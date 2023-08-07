@@ -35,7 +35,7 @@ object Cli extends ZIOCliDefault {
     (for {
       _ <- printLine(s"Creating organization $name")
       _ <- printLine(s"current dir: ${new java.io.File(".").getCanonicalPath}")
-      repo <- ZIO.serviceAt[UserRepository]("ziam")
+      repo <- ZIO.serviceAt[UserRepository](name)
       db <- DbManagement.provisionDatabase(name)
       org <- repo.get.addOrganization(Organization(UUID.randomUUID(), name))
       _ <- printLine(s"Created organization $org")
