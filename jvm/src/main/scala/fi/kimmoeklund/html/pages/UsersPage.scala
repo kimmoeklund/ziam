@@ -83,8 +83,7 @@ case class UsersPage(path: String, db: String) extends Page[UserRepository, User
           form.get("password-confirmation")
         )
         .toZIO
-      orgAndRoles <- repo.get
-        .getOrganizationById(newUserForm.organizationId)
+      orgAndRoles <- repo.get.getOrganizationById(newUserForm.organizationId)
         .validatePar(repo.get.getRolesByIds(newUserForm.roleIds.toSeq))
       user <- repo.get.addUser(
         NewPasswordUser(userId, newUserForm.name, orgAndRoles._1, newUserForm.credentials, orgAndRoles._2)
