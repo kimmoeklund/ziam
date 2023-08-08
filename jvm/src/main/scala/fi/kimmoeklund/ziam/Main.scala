@@ -48,8 +48,7 @@ object Main extends ZIOAppDefault:
   val siteService = for {
     dbMgmt <- ZIO.service[DbManagement]
     sites <- dbMgmt.buildSites
-  } yield (SiteService(sites, authCookie, logoutCookie).asInstanceOf[SiteService[UserRepository]])
-  //TODO can we get rid of the user repository for site service
+  } yield (SiteService(sites, authCookie, logoutCookie))
 
   def run = {
     (siteService.provide(DbManagementLive.live).orDie).flatMap(siteService => {

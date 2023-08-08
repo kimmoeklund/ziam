@@ -34,13 +34,13 @@ case class TabMenu(items: List[Tab]) extends Menu:
 trait Identifiable:
   val id: java.util.UUID
 
-trait LoginPage[-R <: PageService, A]:
+trait LoginPage[R, A]:
   val loginPath: String
   val logoutPath: String
   def doLogin(request: Request): ZIO[Map[String, R], ErrorCode, A]
   def showLogin: Html
 
-trait Page[-R <: PageService, A, B <: Identifiable](using htmlEncoder: HtmlEncoder[B]):
+trait Page[R, A, B <: Identifiable](using htmlEncoder: HtmlEncoder[B]):
 
   val htmlId: String
   val path: String

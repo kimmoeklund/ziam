@@ -1,5 +1,4 @@
 package fi.kimmoeklund.html.pages
-
 import fi.kimmoeklund.service.UserRepository
 import fi.kimmoeklund.domain.FormError.{ InputValueInvalid, MissingInput }
 import fi.kimmoeklund.html.LoginPage
