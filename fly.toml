@@ -18,4 +18,5 @@ primary_region = "arn"
 
 [env]
   DB_LOCATION="/"
+  JDK_TOOL_OPTIONS="-Xms128m -Xss256k"
 

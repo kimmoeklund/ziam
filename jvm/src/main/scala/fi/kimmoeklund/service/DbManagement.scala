@@ -10,11 +10,11 @@ enum DbManagementError:
 
 trait DbManagement:
   def provisionDatabase(dbName: String): IO[DbManagementError, Unit]
-  def buildSites: RIO[DbManagement, Seq[Site[_]]]
+  def buildSites: RIO[DbManagement, Seq[Site[UserRepository]]]
 
 object DbManagement:
   def provisionDatabase(db: String): ZIO[DbManagement, DbManagementError, Unit] =
     ZIO.serviceWithZIO(_.provisionDatabase(db))
 
-  def buildSites: RIO[DbManagement, Seq[Site[_]]] =
+  def buildSites: RIO[DbManagement, Seq[Site[UserRepository]]] =
     ZIO.serviceWithZIO(_.buildSites)

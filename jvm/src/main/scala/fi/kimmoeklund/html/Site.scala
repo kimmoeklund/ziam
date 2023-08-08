@@ -1,20 +1,21 @@
 package fi.kimmoeklund.html
 
 import fi.kimmoeklund.html.pages.*
-import fi.kimmoeklund.service.PageService
+import fi.kimmoeklund.service.{ UserRepository, PageService }
 import zio.*
 import zio.http.html.*
 import zio.http.html.Html.fromDomElement
 import zio.http.{html as _, *}
 
-case class Site[-R <: PageService](
+case class Site[R](
     db: String,
     tabMenu: TabMenu,
     pages: List[Page[R, _, _]],
-    loginPage: LoginPage[R, _]
+    loginPage: LoginPage[R, _],
+    defaultPage: Page[R, _, _]
 )
 
-final case class SiteService[R <: PageService](
+final case class SiteService[R](
     sites: Seq[Site[R]],
     authCookie: Cookie.Response,
     logoutCookie: Cookie.Response
@@ -33,14 +34,19 @@ final case class SiteService[R <: PageService](
     page <- if site.loginPage.loginPath == path then Some(site.loginPage) else None //
   } yield (site)
 
+  private def siteWithLogoutPage(db: String, path: String) = for {
+    site <- sites.find(s => s.db == db)
+    page <- if site.loginPage.logoutPath == path then Some(site.loginPage) else None //
+  } yield (site)
+
   private def setActive(site: Site[R], page: Page[R, _, _]) = site.tabMenu.setActiveTab(Root / site.db / page.path)
 
   def htmlValue(site: Site[R], page: Html): Html = html(
-    htmxHead ++ body(div(classAttr := "container" :: Nil, site.tabMenu.htmlValue, page))
+    htmxHead ++ body(div(classAttr := "container" :: Nil, site.tabMenu.htmlValue, a(hrefAttr := site.loginPage.logoutPath, "Logout"), div(classAttr := "container" :: Nil, page)))
   )
 
   def loginApp: App[Map[String, R]] = Http.collectZIO[Request] {
-    case request @ Method.GET -> Root / db / path if siteWithLoginPage(db, path).isDefined => {
+    case request @ Method.POST -> Root / db / path if siteWithLoginPage(db, path).isDefined => {
       val site = siteWithLoginPage(db, path).get
       site.loginPage
         .doLogin(request)
@@ -48,17 +54,20 @@ final case class SiteService[R <: PageService](
           _ => Response.html(site.loginPage.showLogin),
           _ => Response.seeOther(URL(Root / db / "users")).addCookie(authCookie)
         )
-
     }
-  } // TODO POST LOGIN ja LOGOUT
+    case request @ Method.GET -> Root / db / path if siteWithLoginPage(db, path).isDefined => {
+      val site = siteWithLoginPage(db, path).get
+      ZIO.succeed(Response.html(site.loginPage.showLogin))
+    }
 
-//    case request @ Method.POST -> Root / db / path => getLoginPage(db, path).flatMap { site =>
-//        _ => ZIO.succeed(Response.html(site.loginPage.showLogin)),
-//        _ => ZIO.succeed(Response.seeOther(URL(Root / db / "users")).addCookie(authCookie))
-//
-//    case Method.GET -> Root / db / this.logoutPath => ZIO.succeed(Response.html(showLogin).addCookie(logoutCookie))
-//  }
-//
+    case Request @ Method.GET -> Root / db / path if siteWithLogoutPage(db, path).isDefined => {
+      val site = siteWithLogoutPage(db, path).get
+      ZIO.succeed(Response.seeOther(URL(Root / site.db / site.defaultPage.path )).addCookie(logoutCookie))
+    }
+
+
+  }
+
   def contentApp: App[Map[String, R]] = Http.collectZIO[Request] {
     case request @ Method.GET -> Root / db / path / format =>
       format match {
@@ -128,6 +137,6 @@ object Site {
       PermissionsPage("permissions", db)
     )
     val tabs = pages.map(p => Tab(p.path.capitalize, Root / db / p.path, false))
-    Site(db, TabMenu(tabs), pages, DefaultLoginPage("login", "logout", db))
+    Site(db, TabMenu(tabs), pages, DefaultLoginPage("login", "logout", db), pages(0))
   }
 }
