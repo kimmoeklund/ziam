@@ -129,7 +129,6 @@ final case class SiteService[R](
 
 object Site {
   def build(db: String) = {
-    println("build site: " + db)
     val pages = List(
       UsersPage("users", db),
       OrganizationsPage("organizations", db),
