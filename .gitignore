@@ -8,3 +8,4 @@ target
 postgres-data
 todo.txt
 databases
+node_modules
