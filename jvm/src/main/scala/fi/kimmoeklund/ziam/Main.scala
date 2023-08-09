@@ -39,6 +39,9 @@ object Main extends ZIOAppDefault:
     }
 
   private val scriptsAndMainPage = Http.collectHttp[Request] {
+    case Method.GET -> Root / db / page if (page.endsWith(".html") || page.endsWith(".css")) =>
+      // TODO sanization and checking path
+      Http.fromResource("html/" + page)
     case Method.GET -> Root / "scripts" =>
       Http.fromFile(File("../js/target/scala-3.3.0/ziam-fastopt/main.js"))
     case Method.GET -> Root => Handler.response(Response.redirect(URL(Root / "ziam" / "users"))).toHttp
@@ -55,9 +58,12 @@ object Main extends ZIOAppDefault:
       val databases = siteService.sites.map(_.db) 
       val httpApps =
       ZiamApi() ++ siteService.loginApp ++
-        (scriptsAndMainPage.withDefaultErrorResponse ++ siteService.contentApp) @@ whenRequestZIO(invalidCookie)(
-          redirect(URL(Root / "ziam" / "login"), false) // TODO fix the redirect (how ??), cookies should db specific
-        ) 
+        (scriptsAndMainPage.withDefaultErrorResponse ++ siteService.contentApp) 
+
+//        @@ whenRequestZIO(invalidCookie)(
+
+  //        redirect(URL(Root / "ziam" / "login"), false) // TODO fix the redirect (how ??), cookies should db specific
+    //    ) 
 
       Server
       .serve(httpApps)

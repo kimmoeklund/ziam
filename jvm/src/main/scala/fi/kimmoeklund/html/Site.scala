@@ -1,7 +1,7 @@
 package fi.kimmoeklund.html
 
 import fi.kimmoeklund.html.pages.*
-import fi.kimmoeklund.service.{ UserRepository, PageService }
+import fi.kimmoeklund.service.{UserRepository, PageService}
 import zio.*
 import zio.http.html.*
 import zio.http.html.Html.fromDomElement
@@ -42,7 +42,8 @@ final case class SiteService[R](
   private def setActive(site: Site[R], page: Page[R, _, _]) = site.tabMenu.setActiveTab(Root / site.db / page.path)
 
   def htmlValue(site: Site[R], page: Html): Html = html(
-    htmxHead ++ body(div(classAttr := "container" :: Nil, site.tabMenu.htmlValue, a(hrefAttr := site.loginPage.logoutPath, "Logout"), div(classAttr := "container" :: Nil, page)))
+//    htmxHead ++ body(div(classAttr := "container" :: Nil, site.tabMenu.htmlValue, a(hrefAttr := site.loginPage.logoutPath, "Logout"), div(classAttr := "container" :: Nil, page)))
+    page
   )
 
   def loginApp: App[Map[String, R]] = Http.collectZIO[Request] {
@@ -62,38 +63,38 @@ final case class SiteService[R](
 
     case Request @ Method.GET -> Root / db / path if siteWithLogoutPage(db, path).isDefined => {
       val site = siteWithLogoutPage(db, path).get
-      ZIO.succeed(Response.seeOther(URL(Root / site.db / site.defaultPage.path )).addCookie(logoutCookie))
+      ZIO.succeed(Response.seeOther(URL(Root / site.db / site.defaultPage.path)).addCookie(logoutCookie))
     }
-
-
   }
 
   def contentApp: App[Map[String, R]] = Http.collectZIO[Request] {
     case request @ Method.GET -> Root / db / path / format =>
-      format match {
-        case "options" =>
-          getPage(path, db).flatMap((site, page) =>
+      getPage(path, db).flatMap((site, page) =>
+        format match {
+          case "options" =>
             page.optionsList
               .mapBoth(
                 e => Response.text(e.toString).withStatus(Status.InternalServerError),
                 (p: Html) => htmlSnippet(p)
               )
-          )
-
-        case _ => ZIO.succeed(Response.status(Status.UnsupportedMediaType))
-      }
+          case "th" => ZIO.succeed(htmlSnippet(page.tableHeaders.fold(Html.fromUnit(()))(_ ++ _)))
+          case "form" if page.isInstanceOf[NewResourceForm[_]] =>
+            ZIO.succeed(htmlSnippet(page.asInstanceOf[NewResourceForm[_]].htmlForm.fold(Html.fromUnit(()))(_ ++ _)))
+          case _ => ZIO.succeed(Response.status(Status.UnsupportedMediaType))
+        }
+      )
 
     case Method.GET -> Root / db / path =>
       getPage(path, db).flatMap((site, page) =>
         setActive(site, page)
-        page.tableList.foldZIO(
+        page.tableRows.foldZIO(
           e => {
             for {
               _ <- ZIO.logInfo(e.toString)
               response <- ZIO.succeed(Response.text(e.toString).withStatus(Status.InternalServerError))
             } yield response
           },
-          (result: Html) => ZIO.succeed(Response.html(htmlValue(site, result)))
+          (result: Seq[Dom]) => ZIO.succeed(htmlSnippet(result)) //// Response.html(htmlValue(site, result)))
         )
       )
 

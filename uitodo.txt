@@ -1,0 +1,18 @@
+- //mihin css tiloihin transformaatiot pitaisi sitoa?
+- UI refactoring: 
+  - HTML sivu static 
+  - pages => tables + forms and buttons
+  - navigation static (first, dynamic later)
+  - site renamed more generic
+
+////
+
+UI bugi on my;s vanhassa.. ziam kannan data issue? 
+
+- td, th tyylit
+- formin toiminta
+- "sivun parametrisointi"
+-> CSS workflow (tailwind build, "default sisällön poisto"
+
+
+

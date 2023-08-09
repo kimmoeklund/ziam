@@ -16,6 +16,6 @@ object Htmx:
       PartialAttribute("hx-trigger") := "revealed",
       PartialAttribute("hx-params") := "none",
       PartialAttribute("hx-target") := s"#$name-select",
-      PartialAttribute("hx-swap") := "innerHTML"
+        PartialAttribute("hx-swap") := "innerHTML"
     ) ++ (if (selectMultiple) then Chunk[Html](multipleAttr := "multiple") else Chunk[Html]())
-    select(attributes:_*)
+    Html.fromDomElement(select(attributes:_*))

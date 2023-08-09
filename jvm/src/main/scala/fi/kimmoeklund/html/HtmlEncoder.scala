@@ -2,59 +2,60 @@ package fi.kimmoeklund.html
 
 import zio.http.html.Element.PartialElement
 import magnolia1.*
-import zio.http.html.Dom
+import zio.http.html.classAttr
+import zio.http.html.typeAttr
+import zio.http.html.Attributes.PartialAttribute
+import zio.*
+import zio.http.html.Html
+import scala.annotation.Annotation
 
-extension [A: HtmlEncoder](value: A)
-  def wrapWith(element: PartialElement, strModifier: String => String = a => a): List[Dom] =
-    summon[HtmlEncoder[A]].wrapValueWith(element, value, strModifier)
-
+//extension [A: HtmlEncoder](value: A)
+//  def encodeValues(template: String => Html): List[Html] =
+//    HtmlEncoder[A].encodeValues(template)
+//
 trait HtmlEncoder[A]:
-  def wrapValueWith(element: PartialElement, value: A, strModifier: String => String = a => a): List[Dom]
-  def wrapParametersWith(element: PartialElement, strModifier: String => String = a => a): List[Dom]
+  def encodeParams(template: (String, Seq[Html]) => Html, annotationMapper: (Any, String) => Html = (_, _) => Html.fromUnit(())) : List[Html]
+  def encodeValues(template: String => Html, value: A): List[Html]
 
-object HtmlEncoder extends Derivation[HtmlEncoder]:
+object HtmlEncoder extends Derivation[HtmlEncoder] {
 
   inline def apply[A](using A: HtmlEncoder[A]): HtmlEncoder[A] = A
 
   override def split[A](ctx: SealedTrait[HtmlEncoder, A]): HtmlEncoder[A] =
     new HtmlEncoder[A]:
-      def wrapValueWith(element: PartialElement, value: A, strModifier: String => String) = ctx.choose(value) { sub =>
-        List(element(strModifier(sub.typeInfo.short)))
+      def encodeParams(template: (String, Seq[Html]) => Html, annotationMapper: (Any, String) => Html) = List(
+        template(ctx.typeInfo.short, ctx.annotations.map(a => annotationMapper(a, ctx.typeInfo.short)).toSeq)) //, ctx.annotations.map(annotationMapper):_*)
+
+      def encodeValues(template: String => Html, value: A) = ctx.choose(value) { sub =>
+        // use value only if it's different than the typeInfo short, as for enums without value, they are the same
+        List(template(if sub.typeInfo.short != value.toString then value.toString else sub.typeInfo.short))
       }
-      def wrapParametersWith(element: PartialElement, strModifier: String => String) = List(element(ctx.typeInfo.short))
 
   override def join[A](ctx: CaseClass[HtmlEncoder, A]): HtmlEncoder[A] =
     new HtmlEncoder[A]:
-      def wrapValueWith(element: PartialElement, value: A, strModifier: String => String) =
-        ctx.params.foldLeft(List[Dom]()) { (acc, p) =>
-          acc ++ p.typeclass.wrapValueWith(element, p.deref(value), strModifier)
-        }
-      def wrapParametersWith(element: PartialElement, strModifier: String => String) =
-        ctx.params.map(p => element(strModifier(p.label))).toList
+      def encodeParams(template: (String, Seq[Html]) => Html, annotationMapper: (Any, String) => Html) = {
+//        println("debug" + ctx.params.map(_.annotations.map((a2: Any) => a2.map(_.toString))))
+        ctx.params.map(p => {
+          println(p)          
+          template(p.label, p.annotations.map(a => { 
+            println(a)
+            annotationMapper(a, p.label)
+          }))
+        }).toList     
+      }
+      
+      def encodeValues(template: String => Html, value: A) = ctx.params.foldLeft(List[Html]()) { (acc, p) =>
+        acc ++ p.typeclass.encodeValues(template, p.deref(value))
+      }
 
-  given HtmlEncoder[java.util.UUID] with {
-    def wrapValueWith(element: PartialElement, value: java.util.UUID, strModifier: String => String) = List(
-      element(strModifier(value.toString))
-    )
-    def wrapParametersWith(element: PartialElement, strModifier: String => String) = List(element(strModifier("uuid")))
+  given [A <: String | Int | java.util.UUID]: HtmlEncoder[A] with {
+    def encodeParams(template: (String, Seq[Html]) => Html, annotationMapper: (Any, String) => Html) = List(template("", Seq()))
+    def encodeValues(template: String => Html, value: A): List[Html] = List(template(value.toString))
   }
-  given HtmlEncoder[String] with {
-    def wrapValueWith(element: PartialElement, value: String, strModifier: String => String) = List(
-      element(strModifier(value.toString))
-    )
-    def wrapParametersWith(element: PartialElement, strModifier: String => String) = List(
-      element(strModifier("string"))
-    )
-  }
-  given HtmlEncoder[Int] with {
-    def wrapValueWith(element: PartialElement, value: Int, strModifier: String => String) = List(
-      element(value.toString)
-    )
-    def wrapParametersWith(element: PartialElement, strModifier: String => String) = List(element(strModifier("int")))
-  }
+  
   given [A: HtmlEncoder]: HtmlEncoder[Seq[A]] with {
-    def wrapValueWith(element: PartialElement, value: Seq[A], strModifier: String => String) =
-      value.flatMap(summon[HtmlEncoder[A]].wrapValueWith(element, _, strModifier)).toList
-    def wrapParametersWith(element: PartialElement, strModifier: String => String) =
-      summon[HtmlEncoder[A]].wrapParametersWith(element, strModifier)
+    def encodeParams(template: (String, Seq[Html]) => Html, annotationMapper: (Any, String) => Html) = HtmlEncoder[A].encodeParams(template, annotationMapper)
+    def encodeValues(template: String => Html, value: Seq[A]) = value.flatMap(HtmlEncoder[A].encodeValues(template, _)).toList
   }
+}
+

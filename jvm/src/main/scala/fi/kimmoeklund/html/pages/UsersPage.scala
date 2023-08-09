@@ -13,21 +13,43 @@ import zio.http.{html as _, *}
 
 import java.util.UUID
 import fi.kimmoeklund.html.HtmlEncoder
-import fi.kimmoeklund.html.wrapWith
 import io.github.arainko.ducktape.*
 import fi.kimmoeklund.html.Htmx
 
-case class UserView(id: UUID, name: String, organization: String, roles: Seq[Role], logins: Seq[Login])
+case class UserView(id: UUID, name: String, organization: String, roles: Seq[String], logins: Seq[Login])
     extends Identifiable
 
+case class UserForm(
+    name: String,
+    username: String,
+    @inputEmail email: String,
+    @inputPassword password: String,
+    @inputPassword password_confirmation: String,
+    @inputSelectOptions("roles/options", "roles", true)
+    roles: Seq[String],
+    @inputSelectOptions("organizations/options", "organization", true)
+    organization: String,
+)
+
+object UserForm:
+  given HtmlEncoder[UserForm] = HtmlEncoder.derived[UserForm]
+
 object UserView:
-  def from(u: User) = u.into[UserView].transform(Field.computed(_.organization, u => u.organization.name))
+  def from(u: User) = u
+    .into[UserView]
+    .transform(
+      Field.computed(_.organization, u => u.organization.name),
+      Field.computed(_.roles, u => u.roles.map(_.name))
+    )
   given HtmlEncoder[LoginType] = HtmlEncoder.derived[LoginType]
   given HtmlEncoder[Login] = HtmlEncoder.derived[Login]
   given HtmlEncoder[Role] = HtmlEncoder.derived[Role]
   given HtmlEncoder[UserView] = HtmlEncoder.derived[UserView]
+//  given HtmlEncoder[String] = HtmlEncoder.derived[String]
 
-case class UsersPage(path: String, db: String) extends Page[UserRepository, User, UserView]:
+case class UsersPage(path: String, db: String)
+    extends Page[UserRepository, User, UserView]
+    with NewResourceForm[UserForm]:
   val htmlId = path
   def mapToView = UserView.from(_)
 
@@ -83,7 +105,8 @@ case class UsersPage(path: String, db: String) extends Page[UserRepository, User
           form.get("password-confirmation")
         )
         .toZIO
-      orgAndRoles <- repo.get.getOrganizationById(newUserForm.organizationId)
+      orgAndRoles <- repo.get
+        .getOrganizationById(newUserForm.organizationId)
         .validatePar(repo.get.getRolesByIds(newUserForm.roleIds.toSeq))
       user <- repo.get.addUser(
         NewPasswordUser(userId, newUserForm.name, orgAndRoles._1, newUserForm.credentials, orgAndRoles._2)
@@ -105,3 +128,8 @@ case class UsersPage(path: String, db: String) extends Page[UserRepository, User
     repo <- ZIO.serviceAt[UserRepository](db)
     users <- repo.get.getUsers
   } yield htmlTable(users)
+
+  def listItems = for {
+    repo <- ZIO.serviceAt[UserRepository](db)
+    users <- repo.get.getUsers
+  } yield users

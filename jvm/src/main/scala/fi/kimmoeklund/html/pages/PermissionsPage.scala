@@ -17,13 +17,13 @@ case class PermissionsPage(path: String, db: String) extends Page[UserRepository
 
   val htmlId = path
 
-  private def getPermissions = for {
+  def listItems = for {
     repo <- ZIO.serviceAt[UserRepository](db)
     permissions <- repo.get.getPermissions
   } yield permissions
 
   def mapToView = p => p
-  override def tableList = getPermissions.map(permissions => htmlTable(permissions))
+  override def tableList = listItems.map(permissions => htmlTable(permissions))
 
   def post(request: Request) = (for {
     repo <- ZIO.serviceAt[UserRepository](db)
@@ -42,7 +42,7 @@ case class PermissionsPage(path: String, db: String) extends Page[UserRepository
     _ <- repo.get.deletePermission(uuid)
   } yield ()
 
-  override def optionsList = getPermissions.flatMap(permissions => {
+  override def optionsList = listItems.flatMap(permissions => {
     val targetMap = permissions.groupMap(_.target)(p => p)
     ZIO.succeed(
       targetMap.keys.toList.map(t =>

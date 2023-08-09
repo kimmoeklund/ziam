@@ -18,7 +18,7 @@ case class OrganizationsPage(path: String, db: String) extends Page[UserReposito
 
   val htmlId = path
 
-  private def getOrganizations = for {
+  def listItems = for {
     repo <- ZIO.serviceAt[UserRepository](db)
     organizations <- repo.get.getOrganizations
   } yield organizations
@@ -26,7 +26,7 @@ case class OrganizationsPage(path: String, db: String) extends Page[UserReposito
 
   def mapToView = o => o
 
-  override def tableList = getOrganizations.map(orgs => htmlTable(orgs))
+  override def tableList = listItems.map(orgs => htmlTable(orgs))
 
   override def post(req: Request) =
     (for {
@@ -43,7 +43,7 @@ case class OrganizationsPage(path: String, db: String) extends Page[UserReposito
   } yield ()
 
   override def optionsList =
-    getOrganizations.map(orgs => orgs.map(o => option(o.name, valueAttr := o.id.toString)))
+    listItems.map(orgs => orgs.map(o => option(o.name, valueAttr := o.id.toString)))
 
   def newFormRenderer =
     form(

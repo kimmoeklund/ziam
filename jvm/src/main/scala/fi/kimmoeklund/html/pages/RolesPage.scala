@@ -26,12 +26,13 @@ object RoleView:
 
 case class RolesPage(path: String, db: String) extends Page[UserRepository, Role, RoleView] {
   val htmlId = path
-  private def getRoles = for {
+
+  def listItems = for {
     repo <- ZIO.serviceAt[UserRepository](db)
     orgs <- repo.get.getRoles
   } yield orgs
 
-  override def tableList = getRoles.map(roles => htmlTable(roles))
+  override def tableList = listItems.map(roles => htmlTable(roles))
 
   def mapToView = r => RoleView.from(r)
 
@@ -91,5 +92,5 @@ case class RolesPage(path: String, db: String) extends Page[UserRepository, Role
     ) ++
       script(srcAttr := "/scripts")
 
-  override def optionsList = getRoles.map(roles => roles.map(r => option(r.name, valueAttr := r.id.toString)))
+  override def optionsList = listItems.map(roles => roles.map(r => option(r.name, valueAttr := r.id.toString)))
 }
