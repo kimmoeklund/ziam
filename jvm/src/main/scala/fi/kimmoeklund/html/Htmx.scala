@@ -13,9 +13,9 @@ object Htmx:
       classAttr := "form-select" :: Nil,
       nameAttr := name,
       PartialAttribute("hx-get") := optsPath,
-      PartialAttribute("hx-trigger") := "revealed",
+      PartialAttribute("hx-trigger") := "load",
       PartialAttribute("hx-params") := "none",
       PartialAttribute("hx-target") := s"#$name-select",
-        PartialAttribute("hx-swap") := "innerHTML"
+      PartialAttribute("hx-swap") := "innerHTML"
     ) ++ (if (selectMultiple) then Chunk[Html](multipleAttr := "multiple") else Chunk[Html]())
-    Html.fromDomElement(select(attributes:_*))
+    Html.fromDomElement(select(attributes: _*))

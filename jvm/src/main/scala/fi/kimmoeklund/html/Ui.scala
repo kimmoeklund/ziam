@@ -12,7 +12,8 @@ import scala.annotation.Annotation
 
 final class inputEmail extends Annotation
 final class inputPassword extends Annotation
-final class inputSelectOptions(val path: String, val name: String, val selectMultiple: Boolean = false) extends Annotation
+final class inputSelectOptions(val path: String, val name: String, val selectMultiple: Boolean = false)
+    extends Annotation
 
 trait StaticHtml:
   def htmlValue: Html
@@ -74,22 +75,27 @@ trait NewResourceForm[A](using htmlEncoder: HtmlEncoder[A]):
             typeAttr := "password"
           )
         )
-      case o: inputSelectOptions => Htmx.selectOption(s"$db/${o.path}", o.name, o.selectMultiple)
+      case o: inputSelectOptions => Htmx.selectOption(s"${o.path}", o.name, o.selectMultiple)
       case _                     => Html.fromUnit(())
     }
 
   private val formTemplate = (value: String, mapperOutput: Seq[Html]) =>
-    label(value.capitalize, forAttr := value, Tailwind.formLabel) ++ div(
-      classAttr := "mt-2" :: Nil,
-      /// ongelma on ett' osa kentist' on select ja osa input
-      if mapperOutput.length > 0 then mapperOutput.fold(Html.fromUnit(()))(_ ++ _)
-      else
-        input(
-          nameAttr := value,
-          idAttr := value,
-          Tailwind.formInput,
-          typeAttr := "text"
+    Html.fromDomElement(
+      div(
+        label(value.capitalize, forAttr := value, Tailwind.formLabel),
+        div(
+          classAttr := "mt-2" :: Nil,
+          /// ongelma on ett' osa kentist' on select ja osa input
+          if mapperOutput.length > 0 then mapperOutput.fold(Html.fromUnit(()))(_ ++ _)
+          else
+            input(
+              nameAttr := value,
+              idAttr := value,
+              Tailwind.formInput,
+              typeAttr := "text"
+            )
         )
+      )
     )
 
   def htmlForm = htmlEncoder.encodeParams(formTemplate, inputTypeMapper)
