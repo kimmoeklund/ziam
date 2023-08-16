@@ -9,10 +9,6 @@ import zio.*
 import zio.http.html.Html
 import scala.annotation.Annotation
 
-//extension [A: HtmlEncoder](value: A)
-//  def encodeValues(template: String => Html): List[Html] =
-//    HtmlEncoder[A].encodeValues(template)
-//
 trait HtmlEncoder[A]:
   def encodeParams(template: (String, Seq[Html]) => Html, annotationMapper: (Any, String) => Html = (_, _) => Html.fromUnit(())) : List[Html]
   def encodeValues(template: String => Html, value: A): List[Html]
@@ -24,7 +20,7 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
   override def split[A](ctx: SealedTrait[HtmlEncoder, A]): HtmlEncoder[A] =
     new HtmlEncoder[A]:
       def encodeParams(template: (String, Seq[Html]) => Html, annotationMapper: (Any, String) => Html) = List(
-        template(ctx.typeInfo.short, ctx.annotations.map(a => annotationMapper(a, ctx.typeInfo.short)).toSeq)) //, ctx.annotations.map(annotationMapper):_*)
+        template(ctx.typeInfo.short, ctx.annotations.map(a => annotationMapper(a, ctx.typeInfo.short)).toSeq)) 
 
       def encodeValues(template: String => Html, value: A) = ctx.choose(value) { sub =>
         // use value only if it's different than the typeInfo short, as for enums without value, they are the same
@@ -34,14 +30,7 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
   override def join[A](ctx: CaseClass[HtmlEncoder, A]): HtmlEncoder[A] =
     new HtmlEncoder[A]:
       def encodeParams(template: (String, Seq[Html]) => Html, annotationMapper: (Any, String) => Html) = {
-//        println("debug" + ctx.params.map(_.annotations.map((a2: Any) => a2.map(_.toString))))
-        ctx.params.map(p => {
-          println(p)          
-          template(p.label, p.annotations.map(a => { 
-            println(a)
-            annotationMapper(a, p.label)
-          }))
-        }).toList     
+        ctx.params.map(p => template(p.label, p.annotations.map(a => annotationMapper(a, p.label)))).toList     
       }
       
       def encodeValues(template: String => Html, value: A) = ctx.params.foldLeft(List[Html]()) { (acc, p) =>

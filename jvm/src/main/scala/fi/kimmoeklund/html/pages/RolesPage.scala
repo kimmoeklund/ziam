@@ -15,6 +15,8 @@ import scala.util.Try
 import fi.kimmoeklund.html.Identifiable
 import fi.kimmoeklund.html.HtmlEncoder
 import fi.kimmoeklund.html.Htmx
+import fi.kimmoeklund.html.inputSelectOptions
+import fi.kimmoeklund.html.NewResourceForm
 
 case class RoleView(id: UUID, name: String, permissions: Seq[String]) extends Identifiable
 
@@ -24,15 +26,22 @@ object RoleView:
     .transform(Field.computed(_.permissions, r => r.permissions.map(p => s"${p.target} (${p.permission})")))
   given HtmlEncoder[RoleView] = HtmlEncoder.derived[RoleView]
 
-case class RolesPage(path: String, db: String) extends Page[UserRepository, Role, RoleView] {
+case class RoleForm(
+    name: String,
+    foobar: String,
+    @inputSelectOptions("permissions/options", "permissions", true) permissions: Seq[String]
+)
+
+object RoleForm:
+  given HtmlEncoder[RoleForm] = HtmlEncoder.derived[RoleForm]
+
+case class RolesPage(path: String, db: String) extends Page[UserRepository, Role, RoleView] with NewResourceForm[RoleForm] {
   val htmlId = path
 
   def listItems = for {
     repo <- ZIO.serviceAt[UserRepository](db)
     orgs <- repo.get.getRoles
   } yield orgs
-
-  override def tableList = listItems.map(roles => htmlTable(roles))
 
   def mapToView = r => RoleView.from(r)
 
@@ -68,29 +77,6 @@ case class RolesPage(path: String, db: String) extends Page[UserRepository, Role
     uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(InputValueInvalid("id", "unable to parse as UUID"))
     _ <- repo.get.deleteRole(uuid)
   } yield ()
-
-  def newFormRenderer =
-    form(
-      idAttr := "add-role",
-      PartialAttribute("hx-post") := s"roles",
-      PartialAttribute("hx-swap") := "none",
-      div(
-        classAttr := "mb-3" :: Nil,
-        label(
-          "Role name",
-          forAttr := "name-field",
-          classAttr := "form-label" :: Nil
-        ),
-        input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text")
-      ),
-      div(
-        classAttr := "mb-3" :: Nil,
-        label("Permissions", classAttr := "form-label" :: Nil, forAttr := "permissions-select"),
-        Htmx.selectOption(s"/${this.db}/permissions/options", "permissions", true)
-      ),
-      button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
-    ) ++
-      script(srcAttr := "/scripts")
 
   override def optionsList = listItems.map(roles => roles.map(r => option(r.name, valueAttr := r.id.toString)))
 }

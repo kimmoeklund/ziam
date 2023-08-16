@@ -59,9 +59,7 @@ object Main extends ZIOAppDefault:
       val httpApps =
       ZiamApi() ++ siteService.loginApp ++
         (scriptsAndMainPage.withDefaultErrorResponse ++ siteService.contentApp) 
-
 //        @@ whenRequestZIO(invalidCookie)(
-
   //        redirect(URL(Root / "ziam" / "login"), false) // TODO fix the redirect (how ??), cookies should db specific
     //    ) 
 

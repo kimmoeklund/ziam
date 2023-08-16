@@ -45,50 +45,11 @@ object UserView:
   given HtmlEncoder[Login] = HtmlEncoder.derived[Login]
   given HtmlEncoder[Role] = HtmlEncoder.derived[Role]
   given HtmlEncoder[UserView] = HtmlEncoder.derived[UserView]
-//  given HtmlEncoder[String] = HtmlEncoder.derived[String]
 
 case class UsersPage(path: String, db: String)
     extends Page[UserRepository, User, UserView]
     with NewResourceForm[UserForm]:
-  val htmlId = path
   def mapToView = UserView.from(_)
-
-  def newFormRenderer = form(
-    idAttr := "add-users-form",
-    PartialAttribute("hx-post") := s"/$db/$path",
-    PartialAttribute("hx-swap") := "none",
-    label(
-      "Name",
-      forAttr := "name-field",
-      classAttr := "form-label" :: Nil
-    ),
-    input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text"),
-    label("Username", classAttr := "form-label" :: Nil, forAttr := "username-field"),
-    input(id := "username-field", nameAttr := "username", classAttr := "form-control" :: Nil, typeAttr := "text"),
-    label("Organization", classAttr := "form-label" :: Nil, forAttr := "organization-select"),
-    Htmx.selectOption(s"/${this.db}/organizations/options", "organization", true),
-    label("Roles", classAttr := "form-label" :: Nil, forAttr := "roles-select"),
-    Htmx.selectOption(s"/${this.db}/roles/options", "roles"),
-    label(
-      "Password",
-      classAttr := "form-label" :: Nil,
-      forAttr := "password-field"
-    ),
-    input(
-      id := "password-field",
-      nameAttr := "password",
-      classAttr := "form-control" :: Nil,
-      typeAttr := "password"
-    ),
-    input(
-      id := "password-confirmation",
-      nameAttr := "password-confirmation",
-      classAttr := "form-control" :: Nil,
-      typeAttr := "password"
-    ),
-    button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add") ++
-      script(srcAttr := "/scripts")
-  )
 
   def post(req: Request) = {
     val userId = UUID.randomUUID()
@@ -102,7 +63,7 @@ case class UsersPage(path: String, db: String)
           form.get("roles"),
           form.get("username"),
           form.get("password"),
-          form.get("password-confirmation")
+          form.get("password_confirmation")
         )
         .toZIO
       orgAndRoles <- repo.get

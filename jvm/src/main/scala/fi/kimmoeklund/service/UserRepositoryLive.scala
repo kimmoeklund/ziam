@@ -295,20 +295,6 @@ final class UserRepositoryLive(
 end UserRepositoryLive
 
 object UserRepositoryLive:
-  def pgLayer: ZLayer[
-    Quill.Postgres[CompositeNamingStrategy2[SnakeCase.type, Escape.type]] & Argon2PasswordFactory,
-    Nothing,
-    UserRepository
-  ] = ???
-//  ZLayer {
-//    for {
-//      quill <- ZIO.service[Quill.Postgres[
-//        CompositeNamingStrategy2[SnakeCase.type, Escape.type]
-//      ]]
-//      argon2Factory <- ZIO.service[Argon2PasswordFactory]
-//    } yield UserRepositoryLive(quill, argon2Factory)
-//  }
-
   def sqliteLayer(keys: Seq[String]): ZLayer[
     Map[String, Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]] & Argon2PasswordFactory,
     Nothing,

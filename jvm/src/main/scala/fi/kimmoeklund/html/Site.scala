@@ -9,7 +9,6 @@ import zio.http.{html as _, *}
 
 case class Site[R](
     db: String,
-    tabMenu: TabMenu,
     pages: List[Page[R, _, _]],
     loginPage: LoginPage[R, _],
     defaultPage: Page[R, _, _]
@@ -39,10 +38,7 @@ final case class SiteService[R](
     page <- if site.loginPage.logoutPath == path then Some(site.loginPage) else None //
   } yield (site)
 
-  private def setActive(site: Site[R], page: Page[R, _, _]) = site.tabMenu.setActiveTab(Root / site.db / page.path)
-
   def htmlValue(site: Site[R], page: Html): Html = html(
-//    htmxHead ++ body(div(classAttr := "container" :: Nil, site.tabMenu.htmlValue, a(hrefAttr := site.loginPage.logoutPath, "Logout"), div(classAttr := "container" :: Nil, page)))
     page
   )
 
@@ -86,7 +82,6 @@ final case class SiteService[R](
 
     case Method.GET -> Root / db / path =>
       getPage(path, db).flatMap((site, page) =>
-        setActive(site, page)
         page.tableRows.foldZIO(
           e => {
             for {
@@ -94,7 +89,7 @@ final case class SiteService[R](
               response <- ZIO.succeed(Response.text(e.toString).withStatus(Status.InternalServerError))
             } yield response
           },
-          (result: Seq[Dom]) => ZIO.succeed(htmlSnippet(result)) //// Response.html(htmlValue(site, result)))
+          (result: Seq[Dom]) => ZIO.succeed(htmlSnippet(result)) 
         )
       )
 
@@ -136,7 +131,6 @@ object Site {
       RolesPage("roles", db),
       PermissionsPage("permissions", db)
     )
-    val tabs = pages.map(p => Tab(p.path.capitalize, Root / db / p.path, false))
-    Site(db, TabMenu(tabs), pages, DefaultLoginPage("login", "logout", db), pages(0))
+    Site(db, pages, DefaultLoginPage("login", "logout", db), pages(0))
   }
 }

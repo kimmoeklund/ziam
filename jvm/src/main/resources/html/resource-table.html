@@ -1,7 +1,5 @@
 <script>
-//  var resource = new URLSearchParams(window.location.search).get("resource")
   var resource = window.location.hash.replace("#resource-", "")
-  console.log("resource: " + resource)  
   $("#resource-table tr:first-of-type").attr("hx-get", `${resource}/th`);
   $("#resource-table tbody:first-of-type").attr("hx-get", resource);
 </script>
@@ -44,3 +42,4 @@
     </div>
   </div>
 </div>
+<script src="/scripts">

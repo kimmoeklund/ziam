@@ -13,9 +13,12 @@ import zio.http.{html as _, *}
 import java.util.UUID
 import scala.util.Try
 
-case class PermissionsPage(path: String, db: String) extends Page[UserRepository, Permission, Permission] {
+case class PermissionForm(target: String, @inputNumber permission: Int)
 
-  val htmlId = path
+object PermissionForm:
+  given HtmlEncoder[PermissionForm] = HtmlEncoder.derived[PermissionForm]
+
+case class PermissionsPage(path: String, db: String) extends Page[UserRepository, Permission, Permission] with NewResourceForm[PermissionForm] {
 
   def listItems = for {
     repo <- ZIO.serviceAt[UserRepository](db)
@@ -23,7 +26,6 @@ case class PermissionsPage(path: String, db: String) extends Page[UserRepository
   } yield permissions
 
   def mapToView = p => p
-  override def tableList = listItems.map(permissions => htmlTable(permissions))
 
   def post(request: Request) = (for {
     repo <- ZIO.serviceAt[UserRepository](db)
@@ -53,28 +55,4 @@ case class PermissionsPage(path: String, db: String) extends Page[UserRepository
       )
     )
   })
-
-  def newFormRenderer = 
-    form(
-      idAttr := "add-permission",
-      PartialAttribute("hx-post") := s"/$db/$path",
-      PartialAttribute("hx-swap") := "none",
-      label(
-        "Target",
-        forAttr := "target",
-        input(idAttr := "target", nameAttr := "target", classAttr := "form-control" :: Nil, typeAttr := "text")
-      ),
-      label(
-        "Permission",
-        forAttr := "permission",
-        input(
-          id := "permission",
-          nameAttr := "permission",
-          classAttr := "form-control" :: Nil,
-          typeAttr := "text"
-        )
-      ),
-      button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
-    ) ++
-    script(srcAttr := "/scripts")
 }

@@ -13,10 +13,10 @@ import java.util.UUID
 import scala.util.Try
 import fi.kimmoeklund.html.HtmlEncoder
 
+case class OrganizationForm(name: String)
+
 case class OrganizationsPage(path: String, db: String) extends Page[UserRepository, Organization, Organization] {
   import FormError.*
-
-  val htmlId = path
 
   def listItems = for {
     repo <- ZIO.serviceAt[UserRepository](db)
@@ -25,8 +25,6 @@ case class OrganizationsPage(path: String, db: String) extends Page[UserReposito
 
 
   def mapToView = o => o
-
-  override def tableList = listItems.map(orgs => htmlTable(orgs))
 
   override def post(req: Request) =
     (for {
@@ -44,22 +42,4 @@ case class OrganizationsPage(path: String, db: String) extends Page[UserReposito
 
   override def optionsList =
     listItems.map(orgs => orgs.map(o => option(o.name, valueAttr := o.id.toString)))
-
-  def newFormRenderer =
-    form(
-      idAttr := "add-organization",
-      PartialAttribute("hx-post") := s"/$db/organizations",
-      PartialAttribute("hx-swap") := "none",
-      div(
-        classAttr := "mb-3" :: Nil,
-        label(
-          "Name",
-          forAttr := "name-field",
-          classAttr := "form-label" :: Nil
-        ),
-        input(idAttr := "name-field", nameAttr := "name", classAttr := "form-control" :: Nil, typeAttr := "text")
-      ),
-      button(typeAttr := "submit", classAttr := "btn" :: "btn-primary" :: Nil, "Add")
-    ) ++
-    script(srcAttr := "/scripts")
 }
