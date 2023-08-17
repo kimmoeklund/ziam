@@ -23,7 +23,6 @@ case class PasswordCredentials(
     userName: String,
     password: String
 )
-// refactor with chimney
 
 object Conv:
   def toMember(user: User, org: Organization): Members =
