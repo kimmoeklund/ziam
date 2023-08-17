@@ -53,10 +53,12 @@ lazy val ziam = crossProject(JSPlatform, JVMPlatform)
     testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
     addCompilerPlugin("com.hmemcpy" %% "zio-clippy" % "0.0.1"),
     assembly / mainClass := Some("fi.kimmoeklund.ziam.Main"),
-    assembly / assemblyJarName := "ziam.jar"
+    assembly / assemblyJarName := "ziam.jar",
+    semanticdbEnabled := true
   )
   .jsSettings(
     libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "2.4.0",
     scalaJSUseMainModuleInitializer := true,
   )
-  
+
+scalacOptions += "-Yrangepos, -Xsemanticdb"
