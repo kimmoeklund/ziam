@@ -1,7 +1,7 @@
 package fi.kimmoeklund.html
 
-import zio.http.html.classAttr
 import zio.http.html.Attributes.PartialAttribute
+import zio.http.html.classAttr
 
 object Tailwind:
   val th =

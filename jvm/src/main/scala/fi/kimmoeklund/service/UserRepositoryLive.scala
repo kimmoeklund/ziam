@@ -300,12 +300,13 @@ object UserRepositoryLive:
     Nothing,
     Map[String, UserRepository]
   ] = {
-    val repos = ZIO.foreach(keys) { key =>
-      for {
-        quill <- ZIO.serviceAt[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]](key)
-        argon2Factory <- ZIO.service[Argon2PasswordFactory]
-      } yield (key, UserRepositoryLive(quill.get, argon2Factory).asInstanceOf[UserRepository])
-    }.map(t => ZEnvironment(t.toMap))
+    val repos = ZIO
+      .foreach(keys) { key =>
+        for {
+          quill <- ZIO.serviceAt[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]](key)
+          argon2Factory <- ZIO.service[Argon2PasswordFactory]
+        } yield (key, UserRepositoryLive(quill.get, argon2Factory).asInstanceOf[UserRepository])
+      }
+      .map(t => ZEnvironment(t.toMap))
     ZLayer.fromZIOEnvironment(repos)
   }
-    

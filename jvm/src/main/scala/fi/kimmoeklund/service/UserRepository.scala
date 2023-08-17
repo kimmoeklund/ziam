@@ -7,7 +7,7 @@ import java.util.UUID
 
 trait PageService
 
-trait UserRepository: 
+trait UserRepository:
   def checkUserPassword(userName: String, password: String): IO[ErrorCode, User]
 
   def addUser(user: NewPasswordUser): IO[ErrorCode, User]

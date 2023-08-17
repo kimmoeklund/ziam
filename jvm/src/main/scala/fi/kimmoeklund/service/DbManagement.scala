@@ -1,7 +1,7 @@
 package fi.kimmoeklund.service
 
-import zio.*
 import fi.kimmoeklund.html.Site
+import zio.*
 
 enum DbManagementError:
   case DbAlreadyExists

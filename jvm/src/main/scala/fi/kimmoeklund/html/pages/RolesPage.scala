@@ -2,21 +2,17 @@ package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.FormError.*
 import fi.kimmoeklund.domain.Role
-import fi.kimmoeklund.html.Page
+import fi.kimmoeklund.html._
 import fi.kimmoeklund.service.UserRepository
+import io.github.arainko.ducktape.*
 import zio.*
-import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
+import zio.http.html.*
 import zio.http.{html as _, *}
-import io.github.arainko.ducktape.*
+
 import java.util.UUID
 import scala.util.Try
-import fi.kimmoeklund.html.Identifiable
-import fi.kimmoeklund.html.HtmlEncoder
-import fi.kimmoeklund.html.Htmx
-import fi.kimmoeklund.html.inputSelectOptions
-import fi.kimmoeklund.html.NewResourceForm
 
 case class RoleView(id: UUID, name: String, permissions: Seq[String]) extends Identifiable
 
@@ -35,7 +31,9 @@ case class RoleForm(
 object RoleForm:
   given HtmlEncoder[RoleForm] = HtmlEncoder.derived[RoleForm]
 
-case class RolesPage(path: String, db: String) extends Page[UserRepository, Role, RoleView] with NewResourceForm[RoleForm] {
+case class RolesPage(path: String, db: String)
+    extends Page[UserRepository, Role, RoleView]
+    with NewResourceForm[RoleForm] {
   val htmlId = path
 
   def listItems = for {

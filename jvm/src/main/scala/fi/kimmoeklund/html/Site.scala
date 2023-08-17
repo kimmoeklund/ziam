@@ -1,10 +1,10 @@
 package fi.kimmoeklund.html
 
 import fi.kimmoeklund.html.pages.*
-import fi.kimmoeklund.service.{UserRepository, PageService}
+import fi.kimmoeklund.service.{PageService, UserRepository}
 import zio.*
-import zio.http.html.*
 import zio.http.html.Html.fromDomElement
+import zio.http.html.*
 import zio.http.{html as _, *}
 
 case class Site[R](
@@ -89,7 +89,7 @@ final case class SiteService[R](
               response <- ZIO.succeed(Response.text(e.toString).withStatus(Status.InternalServerError))
             } yield response
           },
-          (result: Seq[Dom]) => ZIO.succeed(htmlSnippet(result)) 
+          (result: Seq[Dom]) => ZIO.succeed(htmlSnippet(result))
         )
       )
 

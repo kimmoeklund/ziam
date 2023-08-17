@@ -19,8 +19,9 @@ enum TestEnum {
 given HtmlEncoder[TestEnum] = HtmlEncoder.derived[TestEnum]
 given HtmlEncoder[LoginType] = HtmlEncoder.derived[LoginType]
 
-val tdTemplate = (value: String) => td(value)
-val annotationMapper = (a: Annotation) => Html.fromUnit(())
+val tdTemplate = (value: String) => Html.fromDomElement(td(value))
+val tdParamsTemplate = (value: String, annotationOutput: Seq[Html]) => Html.fromDomElement(td(value))
+val annotationMapper = (a: Any, value: String) => Html.fromUnit(())
 
 object HtmlEncoderSpec extends ZIOSpecDefault:
   override def spec = suite("HtmlEncoder")(
@@ -37,7 +38,7 @@ object HtmlEncoderSpec extends ZIOSpecDefault:
     },
     test("it should wrap User parameter names with <td>") {
       val result = HtmlEncoder[UserView]
-        .encodeParams(tdTemplate, annotationMapper)
+        .encodeParams(tdParamsTemplate, annotationMapper)
         .map(_.encode)
         .mkString("")
       assertTrue(
@@ -63,10 +64,11 @@ object HtmlEncoderSpec extends ZIOSpecDefault:
       )
     },
     test("it should wrap enum name inside <td>") {
-      val result = HtmlEncoder[TestEnum].encodeParams(tdTemplate, annotationMapper).map(_.encode).mkString("")
+      val result = HtmlEncoder[TestEnum].encodeParams(tdParamsTemplate, annotationMapper).map(_.encode).mkString("")
       assertTrue(result == "<td>TestEnum</td>")
     },
     test("it should label Int as \"\"") {
-      val foo = HtmlEncoder[Int].encodeParams(tdTemplate, annotationMapper)
+      val foo = HtmlEncoder[Int].encodeParams(tdParamsTemplate, annotationMapper)
       assertTrue(foo.map(_.encode).mkString("") == "<td></td>")
-    })
+    }
+  )

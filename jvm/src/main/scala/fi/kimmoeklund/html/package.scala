@@ -1,10 +1,10 @@
 package fi.kimmoeklund.html
 
 import fi.kimmoeklund.domain.{ErrorCode, Permission}
-import zio.http.{html as _, *}
-import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
+import zio.http.html.*
+import zio.http.{html as _, *}
 import zio.prelude.Validation
 
 def htmxHead: Dom = {
@@ -21,11 +21,11 @@ def htmxHead: Dom = {
         "integrityAttr"
       ) := "sha384-lVb3Rd/Ca0AxaoZg5sACe8FJKF0tnUgR2Kd7ehUOG5GCcROv5uBIZsOqovBAcWua",
       PartialAttribute("crossoriginAttr") := "anonymous"
-    ),
+    )
   )
 }
 
-def htmlSnippet(data: Html, status: Status = Status.Ok): Response = 
+def htmlSnippet(data: Html, status: Status = Status.Ok): Response =
   Response(
     status,
     Headers(Header.ContentType(MediaType.text.html).untyped),

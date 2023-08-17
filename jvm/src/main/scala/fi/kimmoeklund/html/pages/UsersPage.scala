@@ -1,20 +1,18 @@
 package fi.kimmoeklund.html.pages
 
-import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.domain.FormError.InputValueInvalid
+import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.html.*
 import fi.kimmoeklund.html.forms.*
 import fi.kimmoeklund.service.UserRepository
+import io.github.arainko.ducktape.*
 import zio.*
-import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
+import zio.http.html.*
 import zio.http.{html as _, *}
 
 import java.util.UUID
-import fi.kimmoeklund.html.HtmlEncoder
-import io.github.arainko.ducktape.*
-import fi.kimmoeklund.html.Htmx
 
 case class UserView(id: UUID, name: String, organization: String, roles: Seq[String], logins: Seq[Login])
     extends Identifiable
@@ -28,7 +26,7 @@ case class UserForm(
     @inputSelectOptions("roles/options", "roles", true)
     roles: Seq[String],
     @inputSelectOptions("organizations/options", "organization", true)
-    organization: String,
+    organization: String
 )
 
 object UserForm:

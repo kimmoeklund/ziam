@@ -13,5 +13,4 @@ def menuHtml = Html.fromString("""
     <li class="nav-item">
       <a class="nav-link" href="#">Users</a>
     </li>
-  </ul>"""
-  )
+  </ul>""")

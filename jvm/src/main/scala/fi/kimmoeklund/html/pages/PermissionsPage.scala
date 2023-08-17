@@ -5,9 +5,9 @@ import fi.kimmoeklund.domain.Permission
 import fi.kimmoeklund.html.*
 import fi.kimmoeklund.service.UserRepository
 import zio.*
-import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
+import zio.http.html.*
 import zio.http.{html as _, *}
 
 import java.util.UUID
@@ -18,7 +18,9 @@ case class PermissionForm(target: String, @inputNumber permission: Int)
 object PermissionForm:
   given HtmlEncoder[PermissionForm] = HtmlEncoder.derived[PermissionForm]
 
-case class PermissionsPage(path: String, db: String) extends Page[UserRepository, Permission, Permission] with NewResourceForm[PermissionForm] {
+case class PermissionsPage(path: String, db: String)
+    extends Page[UserRepository, Permission, Permission]
+    with NewResourceForm[PermissionForm] {
 
   def listItems = for {
     repo <- ZIO.serviceAt[UserRepository](db)

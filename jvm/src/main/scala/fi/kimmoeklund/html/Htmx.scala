@@ -1,9 +1,10 @@
 package fi.kimmoeklund.html
 
-import zio.http.html.*
-import zio.http.html.Attributes.PartialAttribute
-import scala.collection.mutable.ArrayBuffer
 import zio.Chunk
+import zio.http.html.Attributes.PartialAttribute
+import zio.http.html.*
+
+import scala.collection.mutable.ArrayBuffer
 
 object Htmx:
 

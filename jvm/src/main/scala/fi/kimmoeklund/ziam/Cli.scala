@@ -2,10 +2,10 @@ package fi.kimmoeklund.ziam
 
 import fi.kimmoeklund.domain.{NewPasswordCredentials, NewPasswordUser, Organization}
 import fi.kimmoeklund.service.*
-import zio.*
 import zio.Console.printLine
-import zio.cli.*
+import zio.*
 import zio.cli.HelpDoc.Span.text
+import zio.cli.*
 
 import java.util.UUID
 

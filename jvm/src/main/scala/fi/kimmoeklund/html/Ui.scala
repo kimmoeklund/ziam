@@ -2,12 +2,13 @@ package fi.kimmoeklund.html
 
 import fi.kimmoeklund.domain.ErrorCode
 import fi.kimmoeklund.service.PageService
-import zio.http.html.*
+import org.scalafmt.config.DanglingParentheses.Exclude.`class`
+import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
+import zio.http.html.*
 import zio.http.{html as _, *}
 import zio.{ZIO, *}
-import zio.http.html.Attributes.PartialAttribute
-import org.scalafmt.config.DanglingParentheses.Exclude.`class`
+
 import scala.annotation.Annotation
 
 final class inputEmail extends Annotation
@@ -51,7 +52,7 @@ trait NewResourceForm[A](using htmlEncoder: HtmlEncoder[A]):
           )
         )
       case o: inputSelectOptions => Htmx.selectOption(s"${o.path}", o.name, o.selectMultiple)
-      case i: inputNumber => 
+      case i: inputNumber =>
         Html.fromDomElement(
           input(
             nameAttr := value,
@@ -60,7 +61,7 @@ trait NewResourceForm[A](using htmlEncoder: HtmlEncoder[A]):
             typeAttr := "number"
           )
         )
-      case _                     => Html.fromUnit(())
+      case _ => Html.fromUnit(())
     }
 
   private val formTemplate = (value: String, mapperOutput: Seq[Html]) =>
@@ -119,7 +120,7 @@ trait Page[R, A, B <: Identifiable](using htmlEncoder: HtmlEncoder[B]):
     )
 
   def tableHeaders =
-    htmlEncoder.encodeParams(thTemplate) 
+    htmlEncoder.encodeParams(thTemplate)
 
   // todo: double mapping
   def tableRows = listItems

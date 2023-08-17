@@ -1,17 +1,16 @@
 package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.{ErrorCode, FormError, Organization}
-import fi.kimmoeklund.html.Page
+import fi.kimmoeklund.html.{HtmlEncoder, Page}
 import fi.kimmoeklund.service.UserRepository
 import zio.ZIO
-import zio.http.html.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
+import zio.http.html.*
 import zio.http.{Request, html as _, *}
 
 import java.util.UUID
 import scala.util.Try
-import fi.kimmoeklund.html.HtmlEncoder
 
 case class OrganizationForm(name: String)
 
@@ -22,7 +21,6 @@ case class OrganizationsPage(path: String, db: String) extends Page[UserReposito
     repo <- ZIO.serviceAt[UserRepository](db)
     organizations <- repo.get.getOrganizations
   } yield organizations
-
 
   def mapToView = o => o
 

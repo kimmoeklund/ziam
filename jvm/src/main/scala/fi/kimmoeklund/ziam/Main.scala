@@ -1,26 +1,18 @@
 package fi.kimmoeklund.ziam
 
 import com.outr.scalapass.Argon2PasswordFactory
+import fi.kimmoeklund.html.pages.DefaultLoginPage
 import fi.kimmoeklund.html.{Site, SiteService}
 import fi.kimmoeklund.service.*
 import io.getquill.{Escape, SnakeCase}
 import zio.*
+import zio.http.HttpAppMiddleware._
 import zio.http.*
-import zio.http.HttpAppMiddleware.{
-  addCookie,
-  basicAuthZIO,
-  signCookies,
-  whenRequestZIO,
-  whenStatus,
-  customAuthZIO,
-  redirect
-}
 import zio.logging.backend.SLF4J
 import zio.metrics.*
 
 import java.io.File
 import java.time.Duration
-import fi.kimmoeklund.html.pages.DefaultLoginPage
 
 object Main extends ZIOAppDefault:
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
@@ -47,30 +39,32 @@ object Main extends ZIOAppDefault:
     case Method.GET -> Root => Handler.response(Response.redirect(URL(Root / "ziam" / "users"))).toHttp
   }
 
-
   val siteService = for {
     dbMgmt <- ZIO.service[DbManagement]
     sites <- dbMgmt.buildSites
   } yield (SiteService(sites, authCookie, logoutCookie))
 
   def run = {
-    (siteService.provide(DbManagementLive.live).orDie).flatMap(siteService => {
-      val databases = siteService.sites.map(_.db) 
-      val httpApps =
-      ZiamApi() ++ siteService.loginApp ++
-        (scriptsAndMainPage.withDefaultErrorResponse ++ siteService.contentApp) 
+    (siteService
+      .provide(DbManagementLive.live)
+      .orDie)
+      .flatMap(siteService => {
+        val databases = siteService.sites.map(_.db)
+        val httpApps =
+          ZiamApi() ++ siteService.loginApp ++
+            (scriptsAndMainPage.withDefaultErrorResponse ++ siteService.contentApp)
 //        @@ whenRequestZIO(invalidCookie)(
-  //        redirect(URL(Root / "ziam" / "login"), false) // TODO fix the redirect (how ??), cookies should db specific
-    //    ) 
+        //        redirect(URL(Root / "ziam" / "login"), false) // TODO fix the redirect (how ??), cookies should db specific
+        //    )
 
-      Server
-      .serve(httpApps)
-      .provide(
-        Server.default,
-        Argon2.passwordFactory,
-        DataSourceLayer.quill(databases),
-        DataSourceLayer.sqlite(databases),
-        UserRepositoryLive.sqliteLayer(databases),
-      )
-    })
+        Server
+          .serve(httpApps)
+          .provide(
+            Server.default,
+            Argon2.passwordFactory,
+            DataSourceLayer.quill(databases),
+            DataSourceLayer.sqlite(databases),
+            UserRepositoryLive.sqliteLayer(databases)
+          )
+      })
   }

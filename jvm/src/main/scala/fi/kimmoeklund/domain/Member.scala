@@ -1,10 +1,11 @@
 package fi.kimmoeklund.domain
 
+import fi.kimmoeklund.html.{HtmlEncoder, Identifiable}
 import zio.json.*
 import zio.prelude.Validation
 import zio.schema.codec
+
 import java.util.UUID
-import fi.kimmoeklund.html.{ HtmlEncoder, Identifiable }
 
 sealed trait Member
 
@@ -15,7 +16,7 @@ enum LoginType {
 type UserId = UUID
 type OrganizationId = UUID
 
-case class Login(userName: String, loginType: LoginType) 
+case class Login(userName: String, loginType: LoginType)
 
 case class User(id: UUID, name: String, organization: Organization, roles: Seq[Role], logins: Seq[Login]) extends Member
 case class Organization(id: UUID, name: String) extends Member with Identifiable
@@ -61,6 +62,3 @@ object Organization:
   given JsonEncoder[Organization] = DeriveJsonEncoder.gen[Organization]
   given JsonDecoder[Organization] = DeriveJsonDecoder.gen[Organization]
   given HtmlEncoder[Organization] = HtmlEncoder.derived[Organization]
-
-
-

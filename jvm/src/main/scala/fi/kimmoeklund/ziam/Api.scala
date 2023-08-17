@@ -1,15 +1,13 @@
 package fi.kimmoeklund.ziam
 
 import fi.kimmoeklund.domain.FormError.InputValueInvalid
-import fi.kimmoeklund.service.UserRepository
+import fi.kimmoeklund.service.{DataSourceLayer, UserRepository, UserRepositoryLive}
 import zio.*
 import zio.http.*
 import zio.json.*
 import zio.metrics.*
 
 import scala.util.Try
-import fi.kimmoeklund.service.DataSourceLayer
-import fi.kimmoeklund.service.UserRepositoryLive
 
 object ZiamApi:
   def apply() = Http.collectZIO[Request] {

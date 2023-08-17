@@ -11,15 +11,18 @@ import javax.sql.DataSource
 object DataSourceLayer {
 
   def sqlite(keys: Seq[String]) = {
-    val dataSource = ZIO.foreach(keys) { key =>
-      for {
-        config <- ZIO.config(DbConfig.config)
-        ds <- ZIO.succeed({
-          val ds = SQLiteDataSource()
-          ds.setUrl(s"jdbc:sqlite:${config.dbLocation}/${key}.db")
-          ds.asInstanceOf[DataSource]
-        })
-      } yield (key, ds) }.map(t => ZEnvironment(t.toMap))
+    val dataSource = ZIO
+      .foreach(keys) { key =>
+        for {
+          config <- ZIO.config(DbConfig.config)
+          ds <- ZIO.succeed({
+            val ds = SQLiteDataSource()
+            ds.setUrl(s"jdbc:sqlite:${config.dbLocation}/${key}.db")
+            ds.asInstanceOf[DataSource]
+          })
+        } yield (key, ds)
+      }
+      .map(t => ZEnvironment(t.toMap))
     ZLayer.fromZIOEnvironment(dataSource)
   }
 

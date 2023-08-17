@@ -1,7 +1,8 @@
 package fi.kimmoeklund.service
-import zio.*
-import java.io.FilenameFilter
 import fi.kimmoeklund.html.Site
+import zio.*
+
+import java.io.FilenameFilter
 
 final class DbManagementLive extends DbManagement:
   override def provisionDatabase(dbName: String): IO[DbManagementError, Unit] =
