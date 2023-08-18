@@ -8,7 +8,7 @@ import zio.*
 
 import javax.sql.DataSource
 
-object DataSourceLayer {
+object DataSourceLayer:
 
   def sqlite(keys: Seq[String]) = {
     val dataSource = ZIO
@@ -32,7 +32,7 @@ object DataSourceLayer {
     Map[String, DataSource],
     Nothing,
     Map[String, Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]]
-  ] = {
+  ] =
     val env = ZIO
       .foreach(paths) { p =>
         for {
@@ -42,8 +42,5 @@ object DataSourceLayer {
       }
       .map(t => (ZEnvironment(t.toMap)))
     ZLayer.fromZIOEnvironment(env)
-  }
 
-//      ZEnvironment((path -> )))
-//    ZLayer.fromZIOEnvironment(quill)
-}
+end DataSourceLayer

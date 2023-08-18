@@ -1,5 +1,5 @@
 package fi.kimmoeklund.service
-import fi.kimmoeklund.html.Site
+import fi.kimmoeklund.service.Site
 import zio.*
 
 import java.io.FilenameFilter
@@ -18,21 +18,21 @@ final class DbManagementLive extends DbManagement:
         ds.setUrl(s"jdbc:sqlite:${config.dbLocation}/$dbName.db")
         val conn = ds.getConnection()
         val stmt = conn.createStatement()
-        val rs = stmt.executeUpdate(schema)
+        stmt.executeUpdate(schema)
       })
     } yield ()).mapError({ case e: Throwable =>
-      DbManagementError.IOError(e.getMessage())
+      DbManagementError.IOError(e.getMessage)
     })
 
-  override def buildSites =
+  override def buildSites[R] =
     (for {
       config <- ZIO.config(DbConfig.config)
       files <- ZIO.attemptBlockingIO({
         val file = new java.io.File(s"${config.dbLocation}")
-        file.listFiles((dir: java.io.File, name: String) => name.endsWith(".db")).map(_.getName().replace(".db", ""))
+        file.listFiles((dir: java.io.File, name: String) => name.endsWith(".db")).map(_.getName.replace(".db", ""))
       })
       _ <- ZIO.logInfo(s"building sites ${files.toList.map(s => s.toString)}")
-    } yield files.map(Site.build(_)).toSeq)
+    } yield files.map(Site.build).toSeq)
 
 object DbManagementLive {
   def live = ZLayer.scoped {

@@ -6,6 +6,9 @@ import zio.prelude.Validation
 import zio.schema.codec
 
 import java.util.UUID
+import zio.http.html.Template
+import fi.kimmoeklund.html.ElementTemplate
+import fi.kimmoeklund.html.ErrorMsg
 
 sealed trait Member
 
@@ -49,7 +52,13 @@ object Login:
   given JsonDecoder[LoginType] = DeriveJsonDecoder.gen[LoginType]
   given JsonEncoder[Login] = DeriveJsonEncoder.gen[Login]
   given JsonDecoder[Login] = DeriveJsonDecoder.gen[Login]
-
+  given [A: HtmlEncoder]: HtmlEncoder[Seq[Login]] with {
+    override def encodeValues(template: ElementTemplate, value: Seq[Login], errors: Option[Seq[ErrorMsg]], paramName: Option[String], annotations: Seq[Any]) =
+      HtmlEncoder[String].encodeValues(template, value.map(v => s"${v.loginType} (${v.userName})").mkString("<br>"))
+    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) = HtmlEncoder[String].encodeParams(template, "logins")
+  }
+  given HtmlEncoder[Login] = HtmlEncoder.derived[Login]
+  given HtmlEncoder[LoginType] = HtmlEncoder.derived[LoginType]
 object Member:
   given JsonEncoder[Member] = DeriveJsonEncoder.gen[Member]
   given JsonDecoder[Member] = DeriveJsonDecoder.gen[Member]

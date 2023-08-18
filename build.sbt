@@ -16,10 +16,7 @@ ThisBuild / assemblyMergeStrategy := {
     oldStrategy(x)
 }
 
-lazy val copyJS = TaskKey[Unit]("copyJS")
-copyJS := println("foo")
-
-lazy val root = project.in(file(".")).aggregate(ziam.js, ziam.jvm).settings(publish := {}, publishLocal := {}, mainClass := Some("fi.kimmoeklund.ziam.Main"))
+lazy val root = project.in(file(".")).aggregate(ziam.js, ziam.jvm).settings(publish := {}, publishLocal := {})
 lazy val ziam = crossProject(JSPlatform, JVMPlatform)
   .in(file("."))
   .jvmSettings(

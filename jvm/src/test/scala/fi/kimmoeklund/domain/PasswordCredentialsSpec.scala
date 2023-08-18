@@ -12,9 +12,9 @@ object PasswordCredentialsSpec extends ZIOSpecDefault {
         .fromOptions(None, None, None)
         .fold(
           e => {
-            assertTrue(e.contains(MissingInput("username")))
-            assertTrue(e.contains(MissingInput("password")))
-            assertTrue(e.contains(MissingInput("password-confirmation")))
+            assertTrue(e.contains(Missing("username")))
+            assertTrue(e.contains(Missing("password")))
+            assertTrue(e.contains(Missing("password_confirmation")))
           },
           _ => assertTrue(false)
         )

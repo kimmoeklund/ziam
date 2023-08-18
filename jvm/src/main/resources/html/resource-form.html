@@ -41,6 +41,10 @@
               </div>
             </div>
             <div class="flex flex-shrink-0 justify-end px-4 py-4">
+              <button type="button" id="add-resource-panel-clear"
+                class="mr-4 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                Clear
+              </button>
               <button type="button" id="add-resource-panel-cancel"
                 class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                 Cancel
@@ -58,5 +62,9 @@
   <script>
     $("#add-resource-panel-close, #add-resource-panel-cancel").on("click", function () {
       $("#add-resource-panel").toggleClass("hidden")
+    });
+    $("#add-resource-panel-clear").on("click", function () {
+      $("#form").trigger("reset")
+      $("#form :input:enabled:visible:first").focus()
     });
   </script>

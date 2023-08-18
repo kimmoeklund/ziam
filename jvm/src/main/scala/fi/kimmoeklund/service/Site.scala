@@ -1,21 +1,38 @@
-package fi.kimmoeklund.html
+package fi.kimmoeklund.service
 
 import fi.kimmoeklund.html.pages.*
-import fi.kimmoeklund.service.{PageService, UserRepository}
+import fi.kimmoeklund.html.Page
+import fi.kimmoeklund.html.htmlSnippet
+import fi.kimmoeklund.html.NewResourceForm
+import fi.kimmoeklund.service.{RoleRepository, UserRepository}
 import zio.*
-import zio.http.html.Html.fromDomElement
 import zio.http.html.*
+import zio.http.html.Html.fromDomElement
 import zio.http.{html as _, *}
 
-case class Site[R](
-    db: String,
-    pages: List[Page[R, _, _]],
-    loginPage: LoginPage[R, _],
-    defaultPage: Page[R, _, _]
-)
+case class Site(db: String, pages: List[Page[_, _, _]], loginPage: LoginPage[_], defaultPage: Page[_, _, _])
 
-final case class SiteService[R](
-    sites: Seq[Site[R]],
+type Repositories = UserRepository & RoleRepository & PermissionRepository
+
+object Site {
+  def build(db: String) = {
+    val pages = List(
+      UsersPage("users", db),
+      OrganizationsPage("organizations", db),
+      RolesPage("roles", db),
+      PermissionsPage("permissions", db)
+    )
+    Site(
+      db,
+      pages,
+      DefaultLoginPage("login", "logout", db),
+      pages(0)
+    )
+  }
+}
+
+final case class SiteEndpoints(
+    sites: Seq[Site],
     authCookie: Cookie.Response,
     logoutCookie: Cookie.Response
 ) {
@@ -30,19 +47,15 @@ final case class SiteService[R](
 
   private def siteWithLoginPage(db: String, path: String) = for {
     site <- sites.find(s => s.db == db)
-    page <- if site.loginPage.loginPath == path then Some(site.loginPage) else None //
+    page <- if site.loginPage.loginPath == path then Some(site.loginPage) else None
   } yield (site)
 
   private def siteWithLogoutPage(db: String, path: String) = for {
     site <- sites.find(s => s.db == db)
-    page <- if site.loginPage.logoutPath == path then Some(site.loginPage) else None //
+    page <- if site.loginPage.logoutPath == path then Some(site.loginPage) else None
   } yield (site)
 
-  def htmlValue(site: Site[R], page: Html): Html = html(
-    page
-  )
-
-  def loginApp: App[Map[String, R]] = Http.collectZIO[Request] {
+  def loginApp: App[Map[String, Repositories]] = Http.collectZIO[Request] {
     case request @ Method.POST -> Root / db / path if siteWithLoginPage(db, path).isDefined => {
       val site = siteWithLoginPage(db, path).get
       site.loginPage
@@ -63,19 +76,22 @@ final case class SiteService[R](
     }
   }
 
-  def contentApp: App[Map[String, R]] = Http.collectZIO[Request] {
+  def contentApp: App[Map[String, Repositories]] = Http.collectZIO[Request] {
     case request @ Method.GET -> Root / db / path / format =>
       getPage(path, db).flatMap((site, page) =>
         format match {
           case "options" =>
-            page.optionsList
-              .mapBoth(
-                e => Response.text(e.toString).withStatus(Status.InternalServerError),
-                (p: Html) => htmlSnippet(p)
-              )
+            val selected = request.url.queryParams.get("selected") // .map(_.asString.split(",").toSeq)
+            ZIO.logInfo(s"options selected query param: $selected") *>
+              page
+                .optionsList(selected)
+                .mapBoth(
+                  e => Response.text(e.toString).withStatus(Status.InternalServerError),
+                  (p: Html) => htmlSnippet(p)
+                )
           case "th" => ZIO.succeed(htmlSnippet(page.tableHeaders.fold(Html.fromUnit(()))(_ ++ _)))
           case "form" if page.isInstanceOf[NewResourceForm[_]] =>
-            ZIO.succeed(htmlSnippet(page.asInstanceOf[NewResourceForm[_]].htmlForm.fold(Html.fromUnit(()))(_ ++ _)))
+            ZIO.succeed(htmlSnippet(page.asInstanceOf[NewResourceForm[_]].htmlForm()))
           case _ => ZIO.succeed(Response.status(Status.UnsupportedMediaType))
         }
       )
@@ -85,7 +101,6 @@ final case class SiteService[R](
         page.tableRows.foldZIO(
           e => {
             for {
-              _ <- ZIO.logInfo(e.toString)
               response <- ZIO.succeed(Response.text(e.toString).withStatus(Status.InternalServerError))
             } yield response
           },
@@ -120,17 +135,5 @@ final case class SiteService[R](
           .delete(id)
           .foldZIO(_ => ZIO.succeed(Response.status(Status.BadRequest)), _ => ZIO.succeed(Response.status(Status.Ok)))
       )
-  }
-}
-
-object Site {
-  def build(db: String) = {
-    val pages = List(
-      UsersPage("users", db),
-      OrganizationsPage("organizations", db),
-      RolesPage("roles", db),
-      PermissionsPage("permissions", db)
-    )
-    Site(db, pages, DefaultLoginPage("login", "logout", db), pages(0))
   }
 }

@@ -1,6 +1,6 @@
 package fi.kimmoeklund.service
 
-import fi.kimmoeklund.html.Site
+import fi.kimmoeklund.service.Site
 import zio.*
 
 enum DbManagementError:
@@ -10,11 +10,11 @@ enum DbManagementError:
 
 trait DbManagement:
   def provisionDatabase(dbName: String): IO[DbManagementError, Unit]
-  def buildSites: RIO[DbManagement, Seq[Site[UserRepository]]]
+  def buildSites[R]: RIO[DbManagement, Seq[Site]]
 
 object DbManagement:
   def provisionDatabase(db: String): ZIO[DbManagement, DbManagementError, Unit] =
     ZIO.serviceWithZIO(_.provisionDatabase(db))
 
-  def buildSites: RIO[DbManagement, Seq[Site[UserRepository]]] =
+  def buildSites: RIO[DbManagement, Seq[Site]] =
     ZIO.serviceWithZIO(_.buildSites)

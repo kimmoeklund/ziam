@@ -2,17 +2,20 @@ package fi.kimmoeklund.ziam
 
 import com.outr.scalapass.Argon2PasswordFactory
 import fi.kimmoeklund.html.pages.DefaultLoginPage
-import fi.kimmoeklund.html.{Site, SiteService}
+import fi.kimmoeklund.service.{Site, SiteEndpoints}
 import fi.kimmoeklund.service.*
 import io.getquill.{Escape, SnakeCase}
 import zio.*
-import zio.http.HttpAppMiddleware._
 import zio.http.*
+import zio.http.HttpAppMiddleware.*
 import zio.logging.backend.SLF4J
 import zio.metrics.*
 
 import java.io.File
 import java.time.Duration
+import io.getquill.jdbczio.Quill
+import io.getquill.CompositeNamingStrategy2
+import io.getquill.jdbczio.Quill.Sqlite
 
 object Main extends ZIOAppDefault:
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
@@ -32,7 +35,6 @@ object Main extends ZIOAppDefault:
 
   private val scriptsAndMainPage = Http.collectHttp[Request] {
     case Method.GET -> Root / db / page if (page.endsWith(".html") || page.endsWith(".css")) =>
-      // TODO sanization and checking path
       Http.fromResource("html/" + page)
     case Method.GET -> Root / "scripts" =>
       Http.fromFile(File("../js/target/scala-3.3.0/ziam-fastopt/main.js"))
@@ -42,7 +44,7 @@ object Main extends ZIOAppDefault:
   val siteService = for {
     dbMgmt <- ZIO.service[DbManagement]
     sites <- dbMgmt.buildSites
-  } yield (SiteService(sites, authCookie, logoutCookie))
+  } yield (SiteEndpoints(sites, authCookie, logoutCookie))
 
   def run = {
     (siteService
@@ -53,9 +55,9 @@ object Main extends ZIOAppDefault:
         val httpApps =
           ZiamApi() ++ siteService.loginApp ++
             (scriptsAndMainPage.withDefaultErrorResponse ++ siteService.contentApp)
-//        @@ whenRequestZIO(invalidCookie)(
-        //        redirect(URL(Root / "ziam" / "login"), false) // TODO fix the redirect (how ??), cookies should db specific
-        //    )
+        @@ whenRequestZIO (invalidCookie) (
+          redirect(URL(Root / "ziam" / "login"), false) // TODO cookies should db specific and redirect to right site
+        )
 
         Server
           .serve(httpApps)
@@ -64,7 +66,9 @@ object Main extends ZIOAppDefault:
             Argon2.passwordFactory,
             DataSourceLayer.quill(databases),
             DataSourceLayer.sqlite(databases),
-            UserRepositoryLive.sqliteLayer(databases)
+            UserRepositoryLive.sqliteLayer(databases) ++ RoleRepositoryLive
+              .sqliteLayer(databases) ++ PermissionRepositoryLive
+              .layer(databases)
           )
       })
   }

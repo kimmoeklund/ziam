@@ -59,13 +59,13 @@ object UserRepositorySpec extends ZIOSpecDefault:
   }
 
   override def spec = {
-    (suite("UserRepository")(
+    (suite("Repository integration tests")(
       test("it should add permission to the database") {
         check(asciiString, Gen.int) { (name, number) =>
           val permission =
             Permission(UUID.randomUUID(), s"permission-$name", number)
           for {
-            repo <- ZIO.serviceAt[UserRepository]("unittest")
+            repo <- ZIO.serviceAt[PermissionRepository]("unittest")
             result <- repo.get.addPermission(permission)
             testData <- ZIO.service[ZState[TestScenario]]
             _ <- testData.update(data => data.copy(permissions = data.permissions :+ permission))
@@ -75,11 +75,11 @@ object UserRepositorySpec extends ZIOSpecDefault:
       test("it should add roles to the database") {
         check(asciiString) { name =>
           for {
-            repo <- ZIO.serviceAt[UserRepository]("unittest")
+            repo <- ZIO.serviceAt[RoleRepository]("unittest")
             testState <- ZIO.service[ZState[TestScenario]]
             testData <- testState.get
             newRole <- ZIO.succeed(
-              Role(UUID.randomUUID(), s"role-$name", testData.permissions)
+              Role(RoleId(UUID.randomUUID()), s"role-$name", testData.permissions)
             )
             role <- repo.get.addRole(newRole)
             _ <- testState.update(data => data.copy(roles = data.roles :+ newRole))
@@ -117,7 +117,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
       },
       test("it should get and delete permission from the database") {
         for {
-          repo <- ZIO.serviceAt[UserRepository]("unittest")
+          repo <- ZIO.serviceAt[PermissionRepository]("unittest")
           permission <- repo.get.addPermission(Permission(UUID.randomUUID(), "test permission", 1))
           _ <- repo.get.deletePermission(permission.id)
           allPermissions <- repo.get.getPermissions
@@ -125,19 +125,19 @@ object UserRepositorySpec extends ZIOSpecDefault:
       },
       test(label = "it should get permissions by id") {
         for {
-          repo <- ZIO.serviceAt[UserRepository]("unittest")
+          repo <- ZIO.serviceAt[PermissionRepository]("unittest")
           testState <- ZIO.service[ZState[TestScenario]]
           testData <- testState.get
-          permissions <- repo.get.getPermissionsById(testData.permissions.map(p => p.id))
+          permissions <- repo.get.getPermissionsByIds(testData.permissions.map(p => p.id))
         } yield assertTrue(permissions == testData.permissions)
       },
       test("it should delete roles from the database") {
         for {
-          repo <- ZIO.serviceAt[UserRepository]("unittest")
+          repo <- ZIO.serviceAt[RoleRepository]("unittest")
           testState <- ZIO.service[ZState[TestScenario]]
           testData <- testState.get
-          role <- repo.get.addRole(Role(UUID.randomUUID(), "test role", testData.permissions))
-          _ <- repo.get.deleteRole(role.id)
+          role <- repo.get.addRole(Role(RoleId(UUID.randomUUID()), "test role", testData.permissions))
+          _ <- repo.get.deleteRole(RoleId.unwrap(role.id))
           allRoles <- repo.get.getRoles
         } yield assertTrue(!allRoles.exists(r => r.id == role.id))
       },
@@ -155,7 +155,7 @@ object UserRepositorySpec extends ZIOSpecDefault:
           testState <- ZIO.service[ZState[TestScenario]]
           testData <- testState.get
           result <- repo.get.checkUserPassword(testData.users.head.logins.head.userName, "wrong password").flip
-        } yield assertTrue(result == GeneralErrors.IncorrectPassword)
+        } yield assertTrue(result == GeneralError.IncorrectPassword)
       }
     )
       + suite("fetch users")(fetchUsers))
@@ -163,7 +163,8 @@ object UserRepositorySpec extends ZIOSpecDefault:
         ZState.initial(TestScenario.create),
         DataSourceLayer.sqlite(envKeys),
         DataSourceLayer.quill(envKeys),
-        UserRepositoryLive.sqliteLayer(envKeys),
+        UserRepositoryLive.sqliteLayer(envKeys) ++ RoleRepositoryLive.sqliteLayer(envKeys) ++ PermissionRepositoryLive
+          .layer(envKeys),
         Argon2.passwordFactory
       ) @@ sequential @@ samples(1) @@ nondeterministic @@ beforeAll {
       DbManagement.provisionDatabase(envKeys(0)).provide(DbManagementLive.live)

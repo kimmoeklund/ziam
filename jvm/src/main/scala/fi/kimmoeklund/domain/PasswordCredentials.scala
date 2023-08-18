@@ -2,8 +2,6 @@ package fi.kimmoeklund.domain
 
 import zio.prelude.Validation
 
-import java.util.UUID
-
 case class NewPasswordCredentials(userName: String, password: String)
 
 object NewPasswordCredentials:
@@ -19,11 +17,11 @@ object NewPasswordCredentials:
     import Validation.*
     val passwordValidation = for {
       pdws <- validate(
-        fromOption(password).mapError(_ => MissingInput("password")),
-        fromOption(passwordConfirmation).mapError(_ => MissingInput("password-confirmation"))
+        fromOption(password).mapError(_ => Missing("password")),
+        fromOption(passwordConfirmation).mapError(_ => Missing("password_confirmation"))
       )
       pwdMatch <- if (pdws._1 == pdws._2) succeed(pdws._1) else fail(PasswordsDoNotMatch)
     } yield pwdMatch
-    validateWith(fromOption(userName).mapError(_ => MissingInput("username")), passwordValidation)(
+    validateWith(fromOption(userName).mapError(_ => Missing("username")), passwordValidation)(
       this.apply
     )
