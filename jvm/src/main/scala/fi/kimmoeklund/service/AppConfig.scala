@@ -1,6 +1,7 @@
 package fi.kimmoeklund.service
 
 import zio.Config
+import fi.kimmoeklund.html.pages.CookieSecret
 
 case class DbConfig(dbLocation: String, defaultDb: String)
 
@@ -11,3 +12,9 @@ object DbConfig {
         DbConfig(location, default)
     }
 }
+
+object Secrets {
+  def cookieSecret: Config[CookieSecret] =
+    Config.string("cookie_secret").withDefault("changeme").map(CookieSecret(_))
+} 
+

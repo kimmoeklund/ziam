@@ -3,6 +3,7 @@ package fi.kimmoeklund.service
 import fi.kimmoeklund.service.Site
 import zio.*
 import java.io.FilenameFilter
+import fi.kimmoeklund.html.pages.CookieSecret
 
 enum DbManagementError:
   case DbAlreadyExists
@@ -20,17 +21,17 @@ object DbManagement:
   def buildSites: RIO[DbManagement, Seq[Site]] =
    ZIO.serviceWithZIO(_.buildSites)
 
-final class DbManagementLive extends DbManagement:
+final class DbManagementLive(val cookieSecret: CookieSecret) extends DbManagement:
   override def provisionDatabase(dbName: String): IO[DbManagementError, Unit] =
     (for {
       config <- ZIO.config(DbConfig.config)
       file <- ZIO.attemptBlockingIO({
-        val file = new java.io.File(s"${config.dbLocation}/$dbName.db")
+        val file = java.io.File(s"${config.dbLocation}/$dbName.db")
         if file.createNewFile() then ZIO.succeed(file) else ZIO.fail(DbManagementError.DbAlreadyExists)
       })
       schema <- ZIO.attempt(scala.io.Source.fromResource("ziam_schema.sql").mkString)
-      _ <- ZIO.attemptBlocking({
-        val ds = new org.sqlite.SQLiteDataSource()
+      _ <- ZIO.attemptBlockingIO({
+        val ds = org.sqlite.SQLiteDataSource()
         ds.setUrl(s"jdbc:sqlite:${config.dbLocation}/$dbName.db")
         val conn = ds.getConnection()
         val stmt = conn.createStatement()
@@ -44,16 +45,17 @@ final class DbManagementLive extends DbManagement:
     (for {
       config <- ZIO.config(DbConfig.config)
       files <- ZIO.attemptBlockingIO({
-        val file = new java.io.File(s"${config.dbLocation}")
+        val file = java.io.File(s"${config.dbLocation}")
         file.listFiles((dir: java.io.File, name: String) => name.endsWith(".db")).map(_.getName.replace(".db", ""))
       })
       _ <- ZIO.logInfo(s"building sites ${files.toList.map(s => s.toString)}")
-    } yield files.map(Site.build).toSeq)
+    } yield files.map(db => Site.build(db, cookieSecret)).toSeq)
 
 object DbManagementLive {
   def live = ZLayer.scoped {
     for {
-      dbManager <- ZIO.attempt(DbManagementLive())
+      cookieSecret <- ZIO.config(Secrets.cookieSecret)
+      dbManager <- ZIO.attempt(DbManagementLive(cookieSecret))
     } yield (dbManager)
   }
 }

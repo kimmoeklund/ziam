@@ -9,9 +9,8 @@ import zio.metrics.*
 
 import scala.util.Try
 
-// dummy example API
 object ZiamApi:
-  def apply() = Http.collectZIO[Request] {
+  val app = Http.collectZIO[Request] {
 
     case request @ Method.POST -> Root / "api" / db / "auth" =>
       val effect = for {

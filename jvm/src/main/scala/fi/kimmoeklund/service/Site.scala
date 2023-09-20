@@ -6,16 +6,20 @@ import fi.kimmoeklund.html.htmlSnippet
 import fi.kimmoeklund.html.NewResourceForm
 import fi.kimmoeklund.service.{RoleRepository, UserRepository}
 import zio.*
+import zio.prelude.Newtype
 import zio.http.html.*
 import zio.http.html.Html.fromDomElement
 import zio.http.{html as _, *}
+import zio.http.RequestHandlerMiddlewares
+import zio.http.HttpAppMiddleware.*
+import zio.http.RequestHandlerMiddleware
 
 case class Site(db: String, pages: List[Page[_, _, _]], loginPage: LoginPage[_], defaultPage: Page[_, _, _])
 
 type Repositories = UserRepository & RoleRepository & PermissionRepository
 
 object Site {
-  def build(db: String) = {
+  def build(db: String, cookieSecret: CookieSecret) = {
     val pages = List(
       UsersPage("users", db),
       OrganizationsPage("organizations", db),
@@ -25,17 +29,13 @@ object Site {
     Site(
       db,
       pages,
-      DefaultLoginPage("login", "logout", db),
+      DefaultLoginPage("login", "logout", db, cookieSecret),
       pages(0)
     )
   }
 }
 
-final case class SiteEndpoints(
-    sites: Seq[Site],
-    authCookie: Cookie.Response,
-    logoutCookie: Cookie.Response
-) {
+final case class SiteEndpoints(sites: Seq[Site]) {
 
   private def getPage(path: String, db: String) =
     ZIO
@@ -55,6 +55,29 @@ final case class SiteEndpoints(
     page <- if site.loginPage.logoutPath == path then Some(site.loginPage) else None
   } yield (site)
 
+  val checkCookie = new RequestHandlerMiddleware.Simple[Any, Nothing] {
+    override def apply[R1 <: Any, Err1 >: Nothing](
+        handler: Handler[R1, Err1, Request, Response]
+    )(implicit trace: Trace): Handler[R1, Err1, Request, Response] =
+      Handler.fromFunctionZIO[Request] { request =>
+        request.url.path.match {
+          case Root / db / _ => {
+            val site = sites.find(_.db == db)
+            val decryptedCookie = for {
+              cookie <- request.header(Header.Cookie).map(_.value.toChunk).getOrElse(Chunk.empty).find(_.name == db)
+              decrypted <- cookie.unSign(CookieSecret.unwrap(site.get.loginPage.cookieSecret))
+            } yield (decrypted)
+            (site, decryptedCookie) match {
+              case (Some(_), Some(_)) => handler(request)
+              case (None, _)          => ZIO.succeed(Response.status(Status.NotFound))
+              case (Some(site), None) => ZIO.succeed(Response.redirect(URL(Root / site.db / site.loginPage.loginPath)))
+            }
+          }
+          case _ => ZIO.succeed(Response.status(Status.NotFound))
+        }
+      }
+  }
+
   def loginApp: App[Map[String, Repositories]] = Http.collectZIO[Request] {
     case request @ Method.POST -> Root / db / path if siteWithLoginPage(db, path).isDefined => {
       val site = siteWithLoginPage(db, path).get
@@ -62,7 +85,7 @@ final case class SiteEndpoints(
         .doLogin(request)
         .mapBoth(
           _ => Response.html(site.loginPage.showLogin),
-          _ => Response.seeOther(URL(Root / db / "users")).addCookie(authCookie)
+          _ => Response.seeOther(URL(Root / db / "users.html#resource-users")).addCookie(site.loginPage.loginCookie)
         )
     }
     case request @ Method.GET -> Root / db / path if siteWithLoginPage(db, path).isDefined => {
@@ -70,9 +93,9 @@ final case class SiteEndpoints(
       ZIO.succeed(Response.html(site.loginPage.showLogin))
     }
 
-    case Request @ Method.GET -> Root / db / path if siteWithLogoutPage(db, path).isDefined => {
+    case Method.GET -> Root / db / path if siteWithLogoutPage(db, path).isDefined => {
       val site = siteWithLogoutPage(db, path).get
-      ZIO.succeed(Response.seeOther(URL(Root / site.db / site.defaultPage.path)).addCookie(logoutCookie))
+      ZIO.succeed(Response.seeOther(URL(Root / site.db / site.defaultPage.path)).addCookie(site.loginPage.logoutCookie))
     }
   }
 
@@ -107,7 +130,6 @@ final case class SiteEndpoints(
           (result: Seq[Dom]) => ZIO.succeed(htmlSnippet(result))
         )
       )
-
     case req @ Method.POST -> Root / db / path =>
       getPage(path, db).flatMap((site, page) =>
         page
