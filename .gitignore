@@ -1,2 +1,11 @@
 target
 .bloop
+.idea
+.bsp
+.bloop
+.vscode
+.metals
+postgres-data
+todo.txt
+databases
+node_modules
