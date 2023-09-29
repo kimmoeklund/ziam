@@ -4,7 +4,6 @@ import zio.test.*
 import zio.http.html.*
 import fi.kimmoeklund.domain.User
 import java.util.UUID
-import fi.kimmoeklund.domain.Organization
 import fi.kimmoeklund.html.HtmlEncoder
 import fi.kimmoeklund.domain.LoginType
 import fi.kimmoeklund.html.pages.UserView

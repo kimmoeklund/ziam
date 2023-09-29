@@ -1,9 +1,13 @@
 <script>
-  var resource = window.location.hash.replace("#resource-", "")
+  console.log(window.location);
+  var searchParams = new URLSearchParams(window.location.search);
+  var id = searchParams.get("id");
+  var resource = searchParams.get("resource");
+  console.log("opening form with id", id);
   $("#form").attr("hx-post", resource)
-  $("#form-div").attr("hx-get", `${resource}/form`);
+  $("#form-div").attr("hx-get", `${resource}/form${id ? `?id=${id}` : ""}`);
   $("#description").text(`Create new ${resource} by filling in the information below`)
-  $("#slide-over-title").text(`New ${resource}`)
+  $("#slide-over-title").text(`${id ? "Edit" : "New"} ${resource}`)
 </script>
 <div class="relative z-10" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
   <!-- Background backdrop, show/hide based on slide-over state. -->
@@ -61,10 +65,12 @@
   </div>
   <script>
     $("#add-resource-panel-close, #add-resource-panel-cancel").on("click", function () {
-      $("#add-resource-panel").toggleClass("hidden")
+      console.log("closing foobar");
+      console.log($("#add-resource-panel"));
+      $("#add-resource-panel").addClass("hidden");
     });
     $("#add-resource-panel-clear").on("click", function () {
-      $("#form").trigger("reset")
-      $("#form :input:enabled:visible:first").focus()
+      $("#form").trigger("reset");
+      $("#form :input:enabled:visible:first").focus();
     });
   </script>

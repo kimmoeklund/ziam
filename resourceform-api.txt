@@ -1,0 +1,5 @@
+-resource-form API
+  - load empty form for a resource
+  - load form with resource
+  - trigger for load 
+

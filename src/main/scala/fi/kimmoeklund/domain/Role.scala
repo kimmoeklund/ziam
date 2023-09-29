@@ -8,6 +8,7 @@ import fi.kimmoeklund.html.ElementTemplate
 import fi.kimmoeklund.html.ErrorMsg
 import zio.prelude.Newtype
 import zio.http.html.Html
+import fi.kimmoeklund.html.pages.RoleForm
 
 object RoleId extends Newtype[UUID]:
   given HtmlEncoder[RoleId] with {
@@ -19,35 +20,38 @@ object RoleId extends Newtype[UUID]:
         annotations: Seq[Any]
     ) =
       HtmlEncoder[String].encodeValues(template, value.toString, errors, paramName, annotations)
-    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) =
-      HtmlEncoder[String].encodeParams(template, "role", annotations)
+    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[RoleId]) =
+      HtmlEncoder[String].encodeParams(template, "role", annotations, value.map(RoleId.unwrap(_).toString))
   }
-  given HtmlEncoder[Seq[RoleId]] with {
+  given HtmlEncoder[Set[RoleId]] with {
     override def encodeValues(
         template: ElementTemplate,
-        value: Seq[RoleId],
+        value: Set[RoleId],
         errors: Option[Seq[ErrorMsg]],
         paramName: Option[String],
         annotations: Seq[Any]
     ) =
-      HtmlEncoder[String].encodeValues(template, value.mkString(","), errors, paramName, annotations)
-    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) =
+      HtmlEncoder[String].encodeValues(template, value.toSeq.mkString(","), errors, paramName, annotations)
+    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[Set[RoleId]]) =
       HtmlEncoder[String].encodeParams(template, "roles", annotations)
   }
 end RoleId
 
 type RoleId = RoleId.Type
-case class Role(id: RoleId, name: String, permissions: Seq[Permission]) derives HtmlEncoder
+
+case class Role(id: RoleId, name: String, permissions: Seq[Permission]) extends CrudResource[Role, RoleForm] derives HtmlEncoder:
+  override def form = RoleForm(this.name, this.permissions.map(_.id.toString))
+  override def resource = this
 
 object Role:
   given JsonEncoder[Role] = DeriveJsonEncoder.gen[Role]
   given JsonDecoder[Role] = DeriveJsonDecoder.gen[Role]
   given JsonDecoder[RoleId] = JsonDecoder[UUID].map(RoleId(_))
   given JsonEncoder[RoleId] = JsonEncoder[UUID].contramap(RoleId.unwrap)
-  given HtmlEncoder[Seq[Role]] with {
+  given HtmlEncoder[Set[Role]] with {
     override def encodeValues(
         template: ElementTemplate,
-        value: Seq[Role],
+        value: Set[Role],
         errors: Option[Seq[ErrorMsg]],
         paramName: Option[String],
         annotations: Seq[Any]
@@ -59,6 +63,6 @@ object Role:
         paramName,
         annotations
       )
-    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) =
+    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[Set[Role]]) =
       HtmlEncoder[String].encodeParams(template, "roles")
   }

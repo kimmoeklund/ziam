@@ -11,6 +11,7 @@ import java.time.Duration
 import zio.prelude.Newtype
 import scala.util.Try
 import fi.kimmoeklund.service.{ UserRepository, Repositories }
+import fi.kimmoeklund.html.zioFromField
 
 object CookieSecret extends Newtype[String]
 type CookieSecret = CookieSecret.Type
@@ -71,8 +72,8 @@ final case class DefaultLoginPage private (
     for {
       repo <- ZIO.serviceAt[UserRepository](this.db)
       form <- request.body.asURLEncodedForm.orElseFail(ValueInvalid("body", "unable to parse as form"))
-      userName <- ZIO.fromTry(Try(form.get("username").get.stringValue.get)).orElseFail(Missing("username"))
-      password <- ZIO.fromTry(Try(form.get("password").get.stringValue.get)).orElseFail(Missing("password"))
+      userName <- form.zioFromField("username") 
+      password <- form.zioFromField("password")
       user <- repo.get.checkUserPassword(userName, password)
     } yield (user)
 }

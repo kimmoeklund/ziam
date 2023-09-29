@@ -10,8 +10,8 @@ import java.sql.SQLException
 trait RoleRepository:
   def deleteRole(id: UUID): IO[ErrorCode, Unit]
   def updateUserRoles: IO[ErrorCode, Option[User]]
-  def getRoles: IO[GetDataError, Seq[Role]]
-  def getRolesByIds(ids: Seq[RoleId]): IO[GetDataError, Seq[Role]]
+  def getRoles: IO[ExistingEntityError, Seq[Role]]
+  def getRolesByIds(ids: Set[RoleId]): IO[ExistingEntityError, Set[Role]]
   def addRole(role: Role): IO[ErrorCode, Role]
 
 final class RoleRepositoryLive(
@@ -35,7 +35,7 @@ final class RoleRepositoryLive(
       query[Roles].filter(r => r.id == lift(id)).delete
     }.mapBoth(e => GeneralError.Exception(e.getMessage), _ => ())
 
-  override def getRoles: IO[GetDataError, Seq[Role]] = {
+  override def getRoles: IO[ExistingEntityError, Seq[Role]] = {
     run {
       for {
         roles <- query[Roles]
@@ -43,12 +43,12 @@ final class RoleRepositoryLive(
         p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
       } yield (roles, pg, p)
     }.mapBoth(
-      e => GetDataError.Exception(e.getMessage),
+      e => ExistingEntityError.Exception(e.getMessage),
       list => this.mapRoles(list)
     )
   }
 
-  override def getRolesByIds(ids: Seq[RoleId]): IO[GetDataError, Seq[Role]] =
+  override def getRolesByIds(ids: Set[RoleId]): IO[ExistingEntityError, Set[Role]] =
     val uuids = ids.map(RoleId.unwrap)
     run {
       for {
@@ -56,13 +56,13 @@ final class RoleRepositoryLive(
         pg <- query[PermissionGrants].leftJoin(pg => roles.id == pg.roleId)
         p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
       } yield (roles, pg, p)
-    }.map(list => this.mapRoles(list))
+    }.map(list => this.mapRoles(list).toSet)
       .filterOrElseWith(roles => roles.size == ids.size)(roles =>
-        ZIO.fail(GetDataError.EntityNotFound(ids.diff(roles.map(_.id)).mkString(",")))
+          ZIO.fail(ExistingEntityError.EntityNotFound(ids.diff(roles.map(_.id).toSet).mkString(",")))
       )
       .mapError({
-        case e: SQLException => GetDataError.Exception(e.getMessage)
-        case e: GetDataError => e
+        case e: SQLException => ExistingEntityError.Exception(e.getMessage)
+        case e: ExistingEntityError => e
       })
 
   override def addRole(role: Role): IO[ErrorCode, Role] =

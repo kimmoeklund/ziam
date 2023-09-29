@@ -9,16 +9,13 @@ import zio.test.TestAspect.*
 import java.util.UUID
 
 final case class TestScenario(
-    organization: Organization,
     users: List[User],
-    roles: List[Role],
+    roles: Set[Role],
     permissions: List[Permission]
 )
 
-val testOrg = Organization(UUID.randomUUID(), "test org")
-
 object TestScenario:
-  def create: TestScenario = TestScenario(testOrg, List(), List(), List())
+  def create: TestScenario = TestScenario(List(), Set(), List())
 
 object UserRepositorySpec extends ZIOSpecDefault:
 
@@ -82,29 +79,21 @@ object UserRepositorySpec extends ZIOSpecDefault:
               Role(RoleId(UUID.randomUUID()), s"role-$name", testData.permissions)
             )
             role <- repo.get.addRole(newRole)
-            _ <- testState.update(data => data.copy(roles = data.roles :+ newRole))
+            _ <- testState.update(data => data.copy(roles = data.roles + newRole))
           } yield assertTrue(role == newRole)
         }
-      },
-      test("it should add organization to the database") {
-        for {
-          repo <- ZIO.serviceAt[UserRepository]("unittest")
-          testState <- ZIO.service[ZState[TestScenario]]
-          testData <- testState.get
-          org <- repo.get.addOrganization(testData.organization)
-        } yield assertTrue(org == testData.organization)
       },
       test("it should add user to the database") {
         check(unicodeString, asciiString) { (randomName, userName) =>
           {
-            val userId = UUID.randomUUID()
+            val userId = UserId(UUID.randomUUID())
             for {
               repo <- ZIO.serviceAt[UserRepository]("unittest")
               testState <- ZIO.service[ZState[TestScenario]]
               testData <- testState.get
               newPassword <- NewPasswordCredentials.fromOptions(Some(userName), Some(userName), Some(userName)).toZIO
               success <- repo.get.addUser(
-                NewPasswordUser(userId, randomName, testOrg, newPassword, testData.roles)
+                NewPasswordUser(userId, randomName, newPassword, testData.roles)
               )
               _ <- testState.update(data =>
                 data.copy(
@@ -114,6 +103,14 @@ object UserRepositorySpec extends ZIOSpecDefault:
             } yield assertTrue(success.logins.size == 1 && success.logins.head.userName == userName)
           }
         }
+      },
+      test("it should remove role grants from the user") {
+        for {
+          repo <- ZIO.serviceAt[UserRepository]("unittest")
+          testState <- ZIO.service[ZState[TestScenario]]
+          testData <- testState.get
+          user <- repo.get.updateUser(testData.users.head.copy(roles = Set()))
+        } yield assertTrue(user.roles.isEmpty)
       },
       test("it should get and delete permission from the database") {
         for {
@@ -140,14 +137,6 @@ object UserRepositorySpec extends ZIOSpecDefault:
           _ <- repo.get.deleteRole(RoleId.unwrap(role.id))
           allRoles <- repo.get.getRoles
         } yield assertTrue(!allRoles.exists(r => r.id == role.id))
-      },
-      test(label = "it should delete organization") {
-        for {
-          repo <- ZIO.serviceAt[UserRepository]("unittest")
-          org <- repo.get.addOrganization(Organization(UUID.randomUUID(), "test org2"))
-          _ <- repo.get.deleteOrganization(org.id)
-          allOrgs <- repo.get.getOrganizations
-        } yield assertTrue(!allOrgs.exists(o => o.id == org.id))
       },
       test("password auth should fail with wrong password") {
         for {

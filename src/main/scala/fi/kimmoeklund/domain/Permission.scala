@@ -6,10 +6,13 @@ import zio.json.*
 import java.util.UUID
 import fi.kimmoeklund.html.ElementTemplate
 import fi.kimmoeklund.html.ErrorMsg
+import fi.kimmoeklund.html.pages.PermissionForm
 
-case class Permission(id: UUID, target: String, permission: Int) extends Identifiable with Ordered[Permission] {
+case class Permission(id: UUID, target: String, permission: Int) extends Identifiable with Ordered[Permission] with CrudResource[Permission, PermissionForm] {
   import scala.math.Ordered.orderingToOrdered
   def compare(that: Permission): Int = this.id compare that.id
+  def form = PermissionForm(this.target, this.permission)
+  def resource = this
 }
 
 object Permission:
@@ -25,6 +28,6 @@ object Permission:
         annotations: Seq[Any]
     ) =
       HtmlEncoder[String].encodeValues(template, value.map(v => s"${v.target} (${v.permission})").mkString("<br>"))
-    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) =
-      HtmlEncoder[String].encodeParams(template, "permissions")
+    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[Seq[Permission]]) =
+      HtmlEncoder[String].encodeParams(template, "permissions", annotations)
   }

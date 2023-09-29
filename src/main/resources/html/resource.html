@@ -1,0 +1,158 @@
+<!doctype html>
+<html class="h-full bg-gray-100">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/htmx.org@1.9.10"
+    integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC"
+    crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"
+    integrity="sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=" crossorigin="anonymous"></script>
+  <link href="output.css" rel="stylesheet">
+  <meta name="htmx-config" content='{"useTemplateFragments":true}'>
+</head>
+
+
+<body class="h-full">
+  <div class="min-h-full">    
+    <div hx-get="main-nav.html" hx-trigger="load" swap="outerHTML"></div>
+    <main>
+      <!--   <div id="resource-form-new" hx-get="resource-form.html?resource=users" hx-trigger="click from:#add-user-button" </div> -->
+      <!-- <div id="resource-form" hx-get="resource-form.html?resource=users" hx-trigger="click from:#add-user-button" </div> -->
+      <div id="resource-form">
+        <div class="relative z-10" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+          <!-- Background backdrop, show/hide based on slide-over state. -->
+          <div class="hidden fixed inset-0 overflow-hidden" id="add-resource-panel">
+            <div class="absolute inset-0 overflow-hidden">
+              <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10 sm:pl-16">
+                <div id="add-resource-panel-inner" class="pointer-events-auto w-screen max-w-md">
+                  <form id="form" class="flex h-full flex-col divide-y divide-gray-200 bg-white shadow-xl"
+                    hx-select="#form-response" hx-target="#form-content" hx-select-oob="#resource-table-body:beforeend">
+                    <div class="h-0 flex-1 overflow-y-auto">
+                      <div class="bg-indigo-700 px-4 py-6 sm:px-6">
+                        <div class="flex items-center justify-between">
+                          <h2 class="text-base font-semibold leading-6 text-white" id="slide-over-title"></h2>
+                          <div class="ml-3 flex h-7 items-center">
+                            <div id="add-resource-panel-close" type="button"
+                              class="relative rounded-md bg-indigo-700 text-indigo-200 hover:text-white focus:outline-none focus:ring-2 focus:ring-white">
+                              <span class="absolute -inset-2.5"></span>
+                              <span class="sr-only">Close panel</span>
+                              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="mt-1">
+                          <p id="description" class="text-sm text-indigo-300" />
+                        </div>
+                      </div>
+                      <div class="flex flex-1 flex-col justify-between">
+                        <div class="divide-y divide-gray-200 px-4 sm:px-6">
+                          <div id="form-content" class="space-y-6 pb-5 pt-6" hx-trigger="loadform"
+                            hx-select="#form-response" hx-disinherit="*" hx-vals='{"id": null }'>
+                          </div>
+                          <!-- hx-select="#new-form"  -->
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flex flex-shrink-0 justify-end px-4 py-4">
+                      <button type="button" id="add-resource-panel-clear"
+                        class="mr-4 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                        Reset
+                      </button>
+                      <button type="button" id="add-resource-panel-cancel"
+                        class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                        Cancel
+                      </button>
+                      <button type="submit"
+                        class="ml-4 inline-flex justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                        Save
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 sm:px-6 lg:px-8 z-10">
+        <div class="sm:flex sm:items-center">
+          <div class="sm:flex-auto">
+            <h1 class="text-base font-semibold leading-6 text-gray-900">Users</h1>
+            <p class="mt-2 text-sm text-gray-700">A list of all the users in your account including their name, title,
+              email and role.</p>
+          </div>
+          <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+            <button id="add-resource-button" type="button"
+              class="block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Add
+              user</button>
+          </div>
+        </div>
+        <!--        <div hx-get="resource-table.html?resource=users" hx-trigger="load" />  -->
+        <div>
+          <div class="mt-8 flow-root">
+            <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+              <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                <table id="resource-table" class="min-w-full divide-y divide-gray-300">
+                  <thead>
+                    <tr hx-trigger="revealed" hx-swap="outerHTML" hx-target="this">
+                      <div />
+                    </tr>
+                  </thead>
+                  <tbody id="resource-table-body" class="divide-y divide-gray-200" hx-trigger="revealed"
+                    hx-swap="innerHTML" hx-target="this">
+                    <div />
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+    </main>
+</body>
+<script>
+  var loadResource = function (id) {
+    $("#form-content").attr("hx-vals", "{\"id\": \"" + id + "\"}");
+    $("#resource-form").one("htmx:afterSwap", function () {
+      $("#add-resource-panel").removeClass("hidden")
+      $("#slide-over-title").text(`${"Edit"} ${resource}`)
+      $("#description").text(`Edit ${resource} by editing the fields below`)
+    });
+    htmx.trigger("#form-content", "loadform");
+  }
+  var resetAndFocusForm = function () {
+    $("#form").trigger("reset");
+    $("#form :input:enabled:visible:first").focus();
+  }
+  $("#add-resource-button").on("click", function () {
+    $("#resource-form").one("htmx:afterSwap", function () {
+      $("#add-resource-panel").removeClass("hidden")
+    });
+    htmx.trigger("#form-content", "loadform", {});
+  });
+  $("#add-resource-panel-close, #add-resource-panel-cancel").on("click", function () {
+    $("#add-resource-panel").addClass("hidden");
+    $("#form-content").attr("hx-vals", "{\"id\": null }");
+    $("#slide-over-title").text(`${"New"} ${resource}`)
+    $("#description").text(`Create new ${resource} by filling in the information below`)
+    $("#form").attr("hx-post", resource)
+  });
+  $("#add-resource-panel-clear").on("click", function () {
+    resetAndFocusForm();
+  });
+  console.log(window.location);
+  var searchParams = new URLSearchParams(window.location.search);
+  var id = searchParams.get("id");
+  var resource = searchParams.get("resource");
+  console.log("opening form with id", id);
+  console.log("opening form with resource", resource);
+  $("#slide-over-title").text(`${"New"} ${resource}`)
+  $("#description").text(`Create new ${resource} by filling in the information below`)
+  $("#form").attr("hx-post", resource)
+  $("#form-content").attr("hx-get", `${resource}/form`)
+  $("#resource-table tr:first-of-type").attr("hx-get", `${resource}/th`);
+  $("#resource-table tbody:first-of-type").attr("hx-get", resource);
+</script>

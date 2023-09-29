@@ -10,7 +10,7 @@ import zio.*
 import java.sql.SQLException
 import java.util.UUID
 
-type UsersJoin = List[(Members, Members, Option[Roles], Option[Permissions], Option[PasswordCredentials])]
+type UsersJoin = List[(Members, Option[Roles], Option[Permissions], Option[PasswordCredentials])]
 
 final class UserRepositoryLive(
     quill: Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]],
@@ -22,23 +22,21 @@ final class UserRepositoryLive(
   private def mapUsers(
       users: UsersJoin
   ) =
-    val members = users.map(_._1).distinct
-    val organizations = users.groupMap(_._1)(_._2)
-    val permissions = users.groupMap(_._3.orNull)(_._4)
-    val roles = users.groupMap(_._1)(_._3)
-    val creds = users.groupMap(_._1)(_._5)
+    val members     = users.map(_._1).distinct
+    val permissions = users.groupMap(_._2.orNull)(_._3)
+    val roles       = users.groupMap(_._1)(_._2)
+    val creds       = users.groupMap(_._1)(_._4)
     members.map(m =>
       User(
-        m.id,
+        UserId(m.id),
         m.name,
-        organizations(m).head.to[Organization],
         roles(m).flatten.distinct.map(r =>
           Role(
             RoleId(r.id),
             r.name,
             permissions(r).flatten.map(p => Permission(p.id, p.target, p.permission))
           )
-        ),
+        ).toSet,
         creds(m).flatten.distinct.map(c => Login(c.userName, LoginType.PasswordCredentials))
       )
     )
@@ -50,18 +48,17 @@ final class UserRepositoryLive(
     run {
       for {
         creds <- query[PasswordCredentials].filter(p => p.userName == lift(userName))
-        m <- query[Members].join(m => m.id == creds.memberId)
-        o <- query[Members].join(o => o.id == m.organization)
-        rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
-        r <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
-        pg <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
-        p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
-      } yield (m, o, r, p, creds)
+        m     <- query[Members].join(m => m.id == creds.memberId)
+        rg    <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
+        r     <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
+        pg    <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
+        p     <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
+      } yield (m, r, p, creds)
     }.flatMap(resultsRaw =>
       ZIO.blocking(
         resultsRaw.headOption match {
           case Some(row) =>
-            if argon2Factory.verify(password, row._5.passwordHash) then ZIO.succeed(resultsRaw)
+            if argon2Factory.verify(password, row._4.passwordHash) then ZIO.succeed(resultsRaw)
             else ZIO.fail(GeneralError.IncorrectPassword)
           case None => ZIO.fail(GeneralError.EntityNotFound(userName))
         }
@@ -71,39 +68,14 @@ final class UserRepositoryLive(
         case e: SQLException => GeneralError.Exception(e.getMessage)
         case e: GeneralError => e
       },
-      list => this.mapUsers(list.map((m, o, r, p, c) => (m, o, r, p, Some(c)))).head
+      list => this.mapUsers(list.map((m, r, p, c) => (m, r, p, Some(c)))).head
     )
   }
 
-  override def effectivePermissionsForUser(
-      id: String
-  ): IO[ErrorCode, Option[Seq[Permission]]] = ???
-
-  override def getOrganizations: IO[GetDataError, List[Organization]] =
-    run {
-      query[Members].filter(m => m.id == m.organization)
-    }.fold(
-      _ => List(),
-      list => list.map(m => Organization(m.id, m.name))
-    )
-
-  override def addOrganization(org: Organization): IO[ErrorCode, Organization] =
-    run {
-      query[Members].insertValue(
-        lift(
-          Members(
-            org.id,
-            org.id,
-            org.name
-          )
-        )
-      )
-    }.mapBoth(e => GeneralError.Exception(e.getMessage), _ => org)
-
   override def addUser(user: NewPasswordUser): IO[InsertDataError, User] = {
-    val members = toMember(user)
+    val members = user.into[Members].transform(Field.computed(_.id, u => UserId.unwrap(u.id)))
     val creds = PasswordCredentials(
-      user.id,
+      UserId.unwrap(user.id),
       user.credentials.userName,
       argon2Factory.hash(user.credentials.password)
     )
@@ -113,13 +85,12 @@ final class UserRepositoryLive(
         _ <- run(query[PasswordCredentials].insertValue(lift(creds)))
         _ <- run {
           liftQuery(user.roles.map(toRoles)).foreach(r =>
-            query[RoleGrants].insertValue(RoleGrants(r.id, lift(user.id)))
+            query[RoleGrants].insertValue(RoleGrants(r.id, lift(UserId.unwrap(user.id))))
           )
         }
       } yield (User(
         user.id,
         user.name,
-        user.organization,
         user.roles,
         Seq(Login(creds.userName, LoginType.PasswordCredentials))
       ))
@@ -136,35 +107,84 @@ final class UserRepositoryLive(
     })
   }
 
-  override def getUsers = run {
+  override def updateUser(user: User): IO[ExistingEntityError, User] = {
+    val member     = user.into[Members].transform(Field.computed(_.id, u => UserId.unwrap(u.id)))
+    val newRoleIds = user.roles.map(r => RoleId.unwrap(r.id))
+    transaction {
+      for {
+        _              <- run(query[Members].filter(m => m.id == lift(member.id)).updateValue(lift(member)))
+        currentRoleIds <- run(query[RoleGrants].filter(rg => rg.memberId == lift(UserId.unwrap(user.id))).map(_.roleId))
+        _ <- run(
+          liftQuery(newRoleIds.filterNot(r => currentRoleIds.contains(r))).foreach(r =>
+            query[RoleGrants].insertValue(RoleGrants(r, lift(UserId.unwrap(user.id))))
+          )
+        )
+        _ <- run(
+          query[RoleGrants]
+            .filter(r => liftQuery(currentRoleIds.filterNot(r2 => newRoleIds.contains(r2))).contains(r.roleId))
+            .delete
+        )
+      } yield ()
+    }.mapError({
+      case e: SQLException =>
+        ZIO.logError(
+          s"SQLException : ${e.getMessage()} : error code: ${e.getErrorCode()}, : sqlState: ${e.getSQLState()}"
+        )
+        ExistingEntityError.Exception(e.getMessage)
+    }) *> getUsers(Some(user.id)).map(_.head)
+  }
+
+  private val queryJoinTables = (m: Members) => {
     for {
-      m <- query[Members].filter(m => m.organization != m.id)
-      o <- query[Members].join(o => o.organization == m.organization)
-      rg <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
-      r <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
-      pg <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
-      p <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
+      rg    <- query[RoleGrants].leftJoin(rg => rg.memberId == lift(m.id))
+      r     <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
+      pg    <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
+      p     <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
       creds <- query[PasswordCredentials].leftJoin(creds => creds.memberId == m.id)
-    } yield (m, o, r, p, creds)
+    } yield (m, r, p, creds)
+  }
+
+  private val queryJoinTablesFlatMap = (m: Members) => {
+    query[RoleGrants]
+      .leftJoin(rg => rg.memberId == m.id)
+      .flatMap(rg =>
+        query[Roles]
+          .leftJoin(r => r.id == rg.orNull.roleId)
+          .flatMap(r =>
+            query[PermissionGrants]
+              .leftJoin(pg => pg.roleId == r.orNull.id)
+              .flatMap(pg =>
+                query[Permissions]
+                  .leftJoin(p => p.id == pg.orNull.permissionId)
+                  .flatMap(p =>
+                    query[PasswordCredentials]
+                      .leftJoin(creds => creds.memberId == m.id)
+                      .map(creds => (m, r, p, creds))
+                  )
+              )
+          )
+      )
+  }
+
+
+  override def getUsers(userIdOpt: Option[UserId]) = 
+    run {
+    for {
+      m     <- query[Members].filter(m => lift(userIdOpt.map(UserId.unwrap)).filterIfDefined(_ == m.id))
+      rg    <- query[RoleGrants].leftJoin(rg => rg.memberId == m.id)
+      r     <- query[Roles].leftJoin(r => r.id == rg.orNull.roleId)
+      pg    <- query[PermissionGrants].leftJoin(pg => pg.roleId == r.orNull.id)
+      p     <- query[Permissions].leftJoin(p => p.id == pg.orNull.permissionId)
+      creds <- query[PasswordCredentials].leftJoin(creds => creds.memberId == m.id)
+    } yield (m, r, p, creds)
   }
     .fold(
       _ => List(),
       list => mapUsers(list)
     )
-  override def deleteOrganization(id: UUID): IO[ErrorCode, Unit] =
-    run {
-      query[Members].filter(o => o.id == lift(id)).delete
-    }.mapBoth(e => GeneralError.Exception(e.getMessage), _ => ())
 
-  override def getOrganizationById(id: UUID): IO[GetDataError, Organization] =
-    run {
-      query[Members].filter(o => o.id == lift(id) && o.id == o.organization)
-    }.mapError(e => GetDataError.Exception(e.getMessage))
-      .filterOrFail(_.nonEmpty)(GetDataError.EntityNotFound(id.toString))
-      .map(list => list.map(m => Organization(m.id, m.name)).head)
-
-  override def deleteUser(id: UUID): IO[ErrorCode, Unit] = run {
-    query[Members].filter(m => m.id == lift(id)).delete
+  override def deleteUser(id: UserId): IO[ErrorCode, Unit] = run {
+    query[Members].filter(m => m.id == lift(UserId.unwrap(id))).delete
   }.mapBoth(e => GeneralError.Exception(e.getMessage), _ => ())
 
 end UserRepositoryLive
@@ -178,7 +198,7 @@ object UserRepositoryLive:
     val repos = ZIO
       .foreach(keys) { key =>
         for {
-          quill <- ZIO.serviceAt[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]](key)
+          quill         <- ZIO.serviceAt[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]](key)
           argon2Factory <- ZIO.service[Argon2PasswordFactory]
         } yield (key, UserRepositoryLive(quill.get, argon2Factory).asInstanceOf[UserRepository])
       }
