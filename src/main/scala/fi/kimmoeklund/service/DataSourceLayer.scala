@@ -7,8 +7,14 @@ import org.sqlite.SQLiteDataSource
 import zio.*
 
 import javax.sql.DataSource
+import org.sqlite.SQLiteConfig
 
 object DataSourceLayer:
+
+  private val config = 
+    val c = SQLiteConfig()
+    c.enforceForeignKeys(true)
+    c
 
   def sqlite(keys: Seq[String]) = {
     val dataSource = ZIO
@@ -18,6 +24,7 @@ object DataSourceLayer:
           ds <- ZIO.succeed({
             val ds = SQLiteDataSource()
             ds.setUrl(s"jdbc:sqlite:${config.dbLocation}/${key}.db")
+            ds.setConfig(this.config)
             ds.asInstanceOf[DataSource]
           })
         } yield (key, ds)

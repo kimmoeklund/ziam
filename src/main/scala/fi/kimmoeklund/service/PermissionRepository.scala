@@ -3,7 +3,7 @@ package fi.kimmoeklund.service
 import fi.kimmoeklund.domain.Permission
 import fi.kimmoeklund.domain.ErrorCode
 import java.util.UUID
-import fi.kimmoeklund.domain.GetDataError
+import fi.kimmoeklund.domain.ExistingEntityError
 import zio.IO
 import io.getquill.jdbczio.Quill
 import io.getquill.*
@@ -14,9 +14,9 @@ import zio.*
 
 trait PermissionRepository:
   def addPermission(permission: Permission): IO[ErrorCode, Permission]
-  def getPermissions: IO[GetDataError, List[Permission]]
+  def getPermissions: IO[ExistingEntityError, List[Permission]]
   def deletePermission(id: UUID): IO[ErrorCode, Unit]
-  def getPermissionsByIds(ids: Seq[UUID]): IO[GetDataError, List[Permission]]
+  def getPermissionsByIds(ids: Seq[UUID]): IO[ExistingEntityError, List[Permission]]
 
 final class PermissionRepositoryLive(quill: Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]])
     extends PermissionRepository:
@@ -50,11 +50,11 @@ final class PermissionRepositoryLive(quill: Quill.Sqlite[CompositeNamingStrategy
     quote { query[Permissions].filter(p => liftQuery(ids).contains(p.id)) }
   }.map(l => l.map(p => p.to[Permission]))
     .filterOrElseWith(permissions => permissions.size == ids.size)(permissions =>
-      ZIO.fail(GetDataError.EntityNotFound(ids.diff(permissions.map(_.id)).mkString(",")))
+      ZIO.fail(ExistingEntityError.EntityNotFound(ids.diff(permissions.map(_.id)).mkString(",")))
     )
     .mapError({
-      case e: SQLException => GetDataError.Exception(e.getMessage)
-      case e: GetDataError => e
+      case e: SQLException => ExistingEntityError.Exception(e.getMessage)
+      case e: ExistingEntityError => e
     })
 
   override def deletePermission(id: UUID): IO[ErrorCode, Unit] = {

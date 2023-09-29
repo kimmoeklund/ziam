@@ -27,8 +27,12 @@ object Main extends ZIOAppDefault:
 
   val siteService = for {
     dbMgmt <- ZIO.service[DbManagement]
-    sites <- dbMgmt.buildSites
+    sites <- dbMgmt.buildSites[Repositories]
   } yield (SiteEndpoints(sites))
+
+  def cleanup = {
+    ZIO.unit
+  }
 
   def run = {
     (siteService
@@ -37,7 +41,7 @@ object Main extends ZIOAppDefault:
       .flatMap(siteService => {
         val databases = siteService.sites.map(_.db)
         val httpApps =
-          ZiamApi.app ++ siteService.loginApp ++ staticAssets.withDefaultErrorResponse ++ siteService.contentApp @@ siteService.checkCookie
+          ZiamApi.app ++ siteService.loginApp ++ staticAssets.withDefaultErrorResponse ++ siteService.contentApp //TODO @@ siteService.checkCookie 
         Server
           .serve(httpApps)
           .provide(

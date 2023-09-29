@@ -4,6 +4,7 @@ import fi.kimmoeklund.service.Site
 import zio.*
 import java.io.FilenameFilter
 import fi.kimmoeklund.html.pages.CookieSecret
+import fi.kimmoeklund.html.Page
 
 enum DbManagementError:
   case DbAlreadyExists
@@ -12,13 +13,13 @@ enum DbManagementError:
 
 trait DbManagement:
   def provisionDatabase(dbName: String): IO[DbManagementError, Unit]
-  def buildSites[R]: RIO[DbManagement, Seq[Site]]
+  def buildSites[R <: Repositories]: RIO[DbManagement, Seq[Site[R]]]
 
 object DbManagement:
-  def provisionDatabase(db: String): ZIO[DbManagement, DbManagementError, Unit] =
+  def provisionDatabase[R <: Repositories](db: String): ZIO[DbManagement, DbManagementError, Unit] =
     ZIO.serviceWithZIO(_.provisionDatabase(db))
 
-  def buildSites: RIO[DbManagement, Seq[Site]] =
+  def buildSites[R <: Repositories](): RIO[DbManagement, Seq[Site[R]]] =
    ZIO.serviceWithZIO(_.buildSites)
 
 final class DbManagementLive(val cookieSecret: CookieSecret) extends DbManagement:
@@ -41,7 +42,7 @@ final class DbManagementLive(val cookieSecret: CookieSecret) extends DbManagemen
       DbManagementError.IOError(e.getMessage)
     })
 
-  override def buildSites[R] =
+  override def buildSites[R <: Repositories] =
     (for {
       config <- ZIO.config(DbConfig.config)
       files <- ZIO.attemptBlockingIO({
@@ -49,7 +50,7 @@ final class DbManagementLive(val cookieSecret: CookieSecret) extends DbManagemen
         file.listFiles((dir: java.io.File, name: String) => name.endsWith(".db")).map(_.getName.replace(".db", ""))
       })
       _ <- ZIO.logInfo(s"building sites ${files.toList.map(s => s.toString)}")
-    } yield files.map(db => Site.build(db, cookieSecret)).toSeq)
+    } yield files.map(db => Site.build[R](db, cookieSecret)).toSeq)
 
 object DbManagementLive {
   def live = ZLayer.scoped {

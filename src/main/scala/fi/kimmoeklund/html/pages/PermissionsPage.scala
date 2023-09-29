@@ -1,9 +1,9 @@
 package fi.kimmoeklund.html.pages
 
 import fi.kimmoeklund.domain.FormError.*
-import fi.kimmoeklund.domain.Permission
+import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.html.*
-import fi.kimmoeklund.service.{ PermissionRepository }
+import fi.kimmoeklund.service.{PermissionRepository}
 import zio.*
 import zio.http.html.Attributes.PartialAttribute
 import zio.http.html.Html.fromDomElement
@@ -19,23 +19,23 @@ object PermissionForm:
   given HtmlEncoder[PermissionForm] = HtmlEncoder.derived[PermissionForm]
 
 case class PermissionsPage(path: String, db: String)
-    extends Page[PermissionRepository, Permission, Permission]
-    with NewResourceForm[PermissionForm] {
+    extends CrudPage[PermissionRepository, Permission, Permission, PermissionForm]:
 
   def listItems = for {
-    repo <- ZIO.serviceAt[PermissionRepository](db)
+    repo        <- ZIO.serviceAt[PermissionRepository](db)
     permissions <- repo.get.getPermissions
   } yield permissions
 
-  def mapToView = p => p
+  def mapToView = p => p.resource
+  def emptyForm = PermissionForm("", 0)
 
-  def post(request: Request) = (for {
-    repo <- ZIO.serviceAt[PermissionRepository](db)
-    form <- request.body.asURLEncodedForm.orElseFail(ValueInvalid("body", "unable to parse as form"))
-    target <- ZIO.fromTry(Try(form.get("target").get.stringValue.get)).orElseFail(Missing("target"))
-    permission <- ZIO.fromTry(Try(form.get("permission").get.stringValue.get)).orElseFail(Missing("permission"))
-    permissionInt <- ZIO
-      .fromTry(Try(permission.toInt))
+  override def upsertResource(request: Request) = (for {
+    repo   <- ZIO.serviceAt[PermissionRepository](db)
+    form   <- request.body.asURLEncodedForm.orElseFail(ValueInvalid("body", "unable to parse as form"))
+    target <- form.zioFromField("target")
+    permissionInt <- form
+      .zioFromField("permission")
+      .map(_.toInt)
       .orElseFail(ValueInvalid("permission", "unable to parse to integer"))
     p <- repo.get.addPermission(Permission(UUID.randomUUID(), target, permissionInt))
   } yield (p)).map(newResourceHtml)
@@ -43,18 +43,31 @@ case class PermissionsPage(path: String, db: String)
   override def delete(id: String) = for {
     repo <- ZIO.serviceAt[PermissionRepository](db)
     uuid <- ZIO.attempt(UUID.fromString(id)).orElseFail(ValueInvalid("id", "unable to parse as UUID"))
-    _ <- repo.get.deletePermission(uuid)
+    _    <- repo.get.deletePermission(uuid)
   } yield ()
 
   override def optionsList(selected: Option[Seq[String]] = None) = listItems.flatMap(permissions => {
-    val targetMap = permissions.groupMap(_.target)(p => p)
+    val targetMap = permissions.groupMap(_.resource.target)(p => p)
     ZIO.succeed(
       targetMap.keys.toList.map(t =>
         optgroup(
           labelAttr := t,
-          targetMap(t).map(p => option(p.permission.toString, valueAttr := p.id.toString))
+          targetMap(t).map(p =>
+            option(
+              p.resource.permission.toString,
+              valueAttr := p.resource.id.toString,
+              if selected.isDefined && selected.get.contains(p.resource.id.toString) then selectedAttr := "selected"
+              else emptyHtml
+            )
+          )
         )
       )
     )
   })
-}
+
+  override def get(id: String) = for {
+    repo          <- ZIO.serviceAt[PermissionRepository](db)
+    uuid          <- ZIO.attempt(UUID.fromString(id)).orElseFail(ValueInvalid("id", "unable to parse as UUID"))
+    permissionOpt <- repo.get.getPermissionsByIds(Seq(uuid)).map(_.headOption)
+    permission    <- ZIO.fromOption(permissionOpt).orElseFail(ExistingEntityError.EntityNotFound(id))
+  } yield permission

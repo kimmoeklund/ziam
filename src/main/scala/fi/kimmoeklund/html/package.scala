@@ -7,6 +7,9 @@ import zio.http.html.*
 import zio.http.{html as _, *}
 import zio.prelude.Validation
 import zio.Chunk
+import zio.ZIO
+import fi.kimmoeklund.domain.FormError
+import scala.util.Try
 
 def htmxHead: Dom = {
   head(
@@ -53,3 +56,6 @@ def selectOption(
     PartialAttribute("hx-swap") := "innerHTML"
   ) ++ (if (selectMultiple) then Chunk[Html](multipleAttr := "multiple") else Chunk[Html]())
   select(attributes: _*)
+
+extension (form: Form)
+  def zioFromField(field: String): ZIO[Any, FormError, String] = ZIO.fromEither(form.get(field).map(_.stringValue).map(_.get).toRight(FormError.Missing(field)))

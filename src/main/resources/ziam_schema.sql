@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS "members"
 (
     "id"           uuid NOT NULL PRIMARY KEY,
-    "organization" uuid NOT NULL REFERENCES "members" ("id") ON DELETE CASCADE,
     "name"         text
 );
 

@@ -16,7 +16,7 @@ enum GeneralError extends ErrorCode {
   case PageNotFound
 }
 
-enum GetDataError extends ErrorCode {
+enum ExistingEntityError extends ErrorCode {
   case Exception(e: String)
   case EntityNotFound[A](id: String)
 }

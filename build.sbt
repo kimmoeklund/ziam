@@ -1,6 +1,6 @@
 val zioLoggingVersion = "2.1.9"
 val logbackClassicVersion = "1.4.4"
-val quillVersion = "4.6.0.1"
+val quillVersion = "4.8.1"
 val testContainersVersion = "0.40.11"
 val zioVersion = "2.0.11"
 val zioMockVersion = "1.0.0-RC8"
@@ -41,4 +41,4 @@ libraryDependencies ++= Seq(
 testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
 assembly / mainClass := Some("fi.kimmoeklund.ziam.Main")
 assembly / assemblyJarName := "ziam.jar"
-scalacOptions += "-Yrangepos, -Xsemanticdb"
+reStart / mainClass := Some("fi.kimmoeklund.ziam.Main")

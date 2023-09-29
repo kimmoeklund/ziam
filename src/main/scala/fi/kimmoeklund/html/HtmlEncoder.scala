@@ -25,7 +25,8 @@ trait HtmlEncoder[A]:
   def encodeParams(
       template: ElementTemplate,
       paramName: String = "",
-      annotations: Seq[Any] = Seq.empty
+      annotations: Seq[Any] = Seq.empty,
+      value: Option[A] = None
   ): List[Html]
   def encodeValues(
       template: ElementTemplate,
@@ -41,7 +42,7 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
 
   override def split[A](ctx: SealedTrait[HtmlEncoder, A]): HtmlEncoder[A] =
     new HtmlEncoder[A]:
-      def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) =
+      def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[A]) =
         val input = TemplateInput(
           None,
           None,
@@ -57,7 +58,6 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
           paramName: Option[String],
           annotations: Seq[Any]
       ): List[Html] = ctx.choose(value) { sub =>
-        // use value only if it's different than the typeInfo short, as for enums without value, they are the same
         val input = TemplateInput(
           Some(if sub.typeInfo.short != value.toString then value.toString else sub.typeInfo.short),
           errors.errorMsgs(sub.typeInfo.short),
@@ -69,7 +69,7 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
 
   override def join[A](ctx: CaseClass[HtmlEncoder, A]): HtmlEncoder[A] =
     new HtmlEncoder[A]:
-      def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) = {
+      def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[A]) = {
         ctx.params.foldLeft(List[Html]()) { (acc, p) =>
           acc ++ p.typeclass.encodeParams(template, p.label, p.annotations)
         }
@@ -87,7 +87,7 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
         }
 
   given [A <: String | Int | java.util.UUID]: HtmlEncoder[A] with {
-    def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) =
+    def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[A]) =
       val input = TemplateInput(None, None, paramName, annotations)
       List(template(input))
 
@@ -104,7 +104,7 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
   }
 
   given [A: HtmlEncoder]: HtmlEncoder[Seq[A]] with {
-    def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) =
+    def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[Seq[A]]) =
       HtmlEncoder[A].encodeParams(template, paramName, annotations)
     def encodeValues(
         template: ElementTemplate,
@@ -118,7 +118,7 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
   }
 
   given [A: HtmlEncoder]: HtmlEncoder[Option[A]] with {
-    def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any]) =
+    def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[Option[A]]) =
       HtmlEncoder[A].encodeParams(template, paramName, annotations)
     def encodeValues(
         template: ElementTemplate,
@@ -130,5 +130,4 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
       if value.isDefined then HtmlEncoder[A].encodeValues(template, value.get, errors, paramName, annotations)
       else HtmlEncoder[String].encodeValues(template, "", errors, paramName, annotations)
   }
-
 }
