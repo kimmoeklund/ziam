@@ -22,7 +22,7 @@ Ziam's domain is fine grained authorization which you might find usefull in foll
 
 * Scala 3
 * ZIO 2, ZIO Http, Quill, ZIO Config, ZIO Logging, ZIO Prelude, ZIO JSON, ZIO Cli
-* SQLLite
+* SQLite
 * HTMX & Tailwind CSS frontend
 * Mini web framework for htmx apps, including HTML encoding data and forms with Scala 3 macros 
 
