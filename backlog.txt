@@ -1,0 +1,35 @@
+how to make fields in the form "readonly" so that form template can render them as readonly?
+concerns: this concerns only output, but does concern both "empty form" and "filled form"
+
+///
+form-edit
+  - change password
+  - change name (not login)
+  - change roles
+
+form-new
+  - current form 
+
+own type arguments for page or some other solution?
+  https://github.com/iRevive/union-derivation
+move away from annotations to typed fields like Editable, Readonly, Hidden, Email etc (can these compose?)
+
+///
+
+later
+
+subresources, how would you do this?
+
+use <dialog> instead of custom div
+
+normal login-resource crud page
+
+
+users/logins
+  - add/edit/remove logins for a single user
+
+backlog
+
+- todo transactions on service level, create users service which creates user and login in single transaction across two repositories
+- email service integration 
+- zio http upgrade

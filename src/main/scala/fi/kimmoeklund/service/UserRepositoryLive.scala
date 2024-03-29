@@ -144,29 +144,6 @@ final class UserRepositoryLive(
     } yield (m, r, p, creds)
   }
 
-  private val queryJoinTablesFlatMap = (m: Members) => {
-    query[RoleGrants]
-      .leftJoin(rg => rg.memberId == m.id)
-      .flatMap(rg =>
-        query[Roles]
-          .leftJoin(r => r.id == rg.orNull.roleId)
-          .flatMap(r =>
-            query[PermissionGrants]
-              .leftJoin(pg => pg.roleId == r.orNull.id)
-              .flatMap(pg =>
-                query[Permissions]
-                  .leftJoin(p => p.id == pg.orNull.permissionId)
-                  .flatMap(p =>
-                    query[PasswordCredentials]
-                      .leftJoin(creds => creds.memberId == m.id)
-                      .map(creds => (m, r, p, creds))
-                  )
-              )
-          )
-      )
-  }
-
-
   override def getUsers(userIdOpt: Option[UserId]) = 
     run {
     for {

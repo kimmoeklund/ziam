@@ -31,7 +31,6 @@ object Main extends ZIOAppDefault:
   } yield (SiteEndpoints(sites))
 
   def cleanup = {
-    //
     ZIO.unit
   }
 

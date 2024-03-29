@@ -58,7 +58,6 @@ object HtmlEncoder extends Derivation[HtmlEncoder] {
           paramName: Option[String],
           annotations: Seq[Any]
       ): List[Html] = ctx.choose(value) { sub =>
-        // use value only if it's different than the typeInfo short, as for enums without value, they are the same
         val input = TemplateInput(
           Some(if sub.typeInfo.short != value.toString then value.toString else sub.typeInfo.short),
           errors.errorMsgs(sub.typeInfo.short),

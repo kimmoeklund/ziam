@@ -49,7 +49,6 @@ def selectOption(
     idAttr := name,
     classAttr := "form-select" :: Nil,
     nameAttr := name,
-//    PartialAttribute("hx-disinherit") := "*",
     PartialAttribute("hx-get") := s"$optsPath${selectedQueryParams.getOrElse("")}",
     PartialAttribute("hx-trigger") := "load",
     PartialAttribute("hx-params") := "none",

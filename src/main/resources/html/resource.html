@@ -18,8 +18,6 @@
   <div class="min-h-full">    
     <div hx-get="main-nav.html" hx-trigger="load" swap="outerHTML"></div>
     <main>
-      <!--   <div id="resource-form-new" hx-get="resource-form.html?resource=users" hx-trigger="click from:#add-user-button" </div> -->
-      <!-- <div id="resource-form" hx-get="resource-form.html?resource=users" hx-trigger="click from:#add-user-button" </div> -->
       <div id="resource-form">
         <div class="relative z-10" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
           <!-- Background backdrop, show/hide based on slide-over state. -->
@@ -54,7 +52,6 @@
                           <div id="form-content" class="space-y-6 pb-5 pt-6" hx-trigger="loadform"
                             hx-select="#form-response" hx-disinherit="*" hx-vals='{"id": null }'>
                           </div>
-                          <!-- hx-select="#new-form"  -->
                         </div>
                       </div>
                     </div>
@@ -92,7 +89,6 @@
               user</button>
           </div>
         </div>
-        <!--        <div hx-get="resource-table.html?resource=users" hx-trigger="load" />  -->
         <div>
           <div class="mt-8 flow-root">
             <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -143,12 +139,9 @@
   $("#add-resource-panel-clear").on("click", function () {
     resetAndFocusForm();
   });
-  console.log(window.location);
   var searchParams = new URLSearchParams(window.location.search);
   var id = searchParams.get("id");
   var resource = searchParams.get("resource");
-  console.log("opening form with id", id);
-  console.log("opening form with resource", resource);
   $("#slide-over-title").text(`${"New"} ${resource}`)
   $("#description").text(`Create new ${resource} by filling in the information below`)
   $("#form").attr("hx-post", resource)

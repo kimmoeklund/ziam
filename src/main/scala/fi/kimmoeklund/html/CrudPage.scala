@@ -12,23 +12,9 @@ import fi.kimmoeklund.domain.CrudResource
 import fi.kimmoeklund.domain.ErrorCode
 
 trait CrudPage[R, A, B <: Identifiable, C] extends Page[R, CrudResource[A, C], B]:
-  // cases 
-  // - editing form   
-  // - new, empty form - problem as at the moment it requires instance of C - something that we could maybe get rid of
-  // - filled form with errors
-  // -> htmlForm tekee vain formin, id:ll' nimetty div ei kuulu sinne, vaan funktioihin kuten newResourceHtml
-  
-//  def emptyFormHtml(form: C)(using htmlEncdor: HtmlEncoder[C]) = htmlEncoder.encodeParams(formTemplate, "", Seq.empty, Some(form))
-//  def filledForm
-//
-//
-
-
   val attributes = (idAttr := "resource-table-body") //++ (PartialAttribute("hx-swap-oob") := "beforeend");
 
   private def tableRow(r: CrudResource[A,C])(using htmlEncoder: HtmlEncoder[C]) =  
-//    tBody(
-//      PartialAttribute("hx-swap-oob") := "#resource-table:beforeend",
       Html.fromDomElement(tBody(attributes,
       tr(
         PartialAttribute("hx-target") := "this",
