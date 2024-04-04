@@ -15,6 +15,7 @@ import java.io.File
 import io.getquill.jdbczio.Quill
 import io.getquill.CompositeNamingStrategy2
 import io.getquill.jdbczio.Quill.Sqlite
+import zio.http.Header.Location
 
 object Main extends ZIOAppDefault:
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
@@ -23,6 +24,7 @@ object Main extends ZIOAppDefault:
   private val staticAssets = Http.collectHttp[Request] {
     case Method.GET -> Root / db / page if (page.endsWith(".html") || page.endsWith(".css")) =>
       Http.fromResource("html/" + page)
+    case Method.GET -> Root / db => Http.fromHandler(Response.redirect(URL(Root / db / "resource.html?resource=users")).toHandler)
   }
 
   val siteService = for {

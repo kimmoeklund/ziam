@@ -19,11 +19,11 @@ object Cli extends ZIOCliDefault {
       .as(UserOptions(_, _, _))
   val help: HelpDoc =
     HelpDoc.p(
-      "Initializes a new database, creates organization for it assigns the given user as the admin to the organization"
+      "Initializes a new database with an admin user"
     )
 
   val command =
-    Command("create").subcommands(Command("user", options)).withHelp(help)
+    Command("ziam").subcommands(Command("create", options)).withHelp(help)
 
   val cliApp = CliApp.make(
     name = "Ziam Cli",
@@ -32,13 +32,12 @@ object Cli extends ZIOCliDefault {
     command = command
   ) { case UserOptions(database, username, password) =>
     (for {
-      _ <- printLine(s"current dir: ${new java.io.File(".").getCanonicalPath}")
       repo <- ZIO.serviceAt[UserRepository](database)
       db <- DbManagement.provisionDatabase(database)
       user <- repo.get.addUser(
         NewPasswordUser(
           UserId(UUID.randomUUID()),
-          username,
+          "database admin",
           NewPasswordCredentials(username, password),
           Set()
         )

@@ -41,4 +41,5 @@ libraryDependencies ++= Seq(
 testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
 assembly / mainClass := Some("fi.kimmoeklund.ziam.Main")
 assembly / assemblyJarName := "ziam.jar"
+Compile / selectMainClass := Some("fi.kimmoeklund.ziam.Main")
 reStart / mainClass := Some("fi.kimmoeklund.ziam.Main")
