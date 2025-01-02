@@ -37,7 +37,7 @@ Ziam's domain is fine grained authorization which you might find usefull in foll
 Application needs one or more databases to run. You can create a new database with the CLI:
 
 ```shell
-./ziam.sh create --database new.db --user admin --password admin
+./ziam.sh create --database new.db --username admin --password admin
 ```
 
 Once you have one or more databases created, run the application:
