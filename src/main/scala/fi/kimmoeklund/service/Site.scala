@@ -22,8 +22,6 @@ case class Site[-R <: Repositories](
     defaultPage: Page[R, _, _]
 )
 
-// trait CrudPage[R >: Repositories, CrudResource[Forms], B <: Identifiable, C >: Forms] extends Page[R, CrudResource[Forms], B]:
-//
 type RepositoriesIntersect = UserRepository & RoleRepository & PermissionRepository
 type Resources             = User | Role | Permission
 type Views                 = UserView & RoleView & Permission
@@ -56,8 +54,6 @@ given HtmlEncoder[Forms] with {
       HtmlEncoder[PermissionForm].encodeValues(template, form, errors, paramName, annotations)
   }
 }
-
-//given HtmlEncoder[Forms] = HtmlEncoder.derived[Forms]
 
 object Site {
   def build[R <: Repositories](db: String, cookieSecret: CookieSecret) = {

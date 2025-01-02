@@ -47,9 +47,6 @@ object RoleForm:
         value: Option[Seq[PermissionId]] = None) =
       HtmlEncoder[String].encodeParams(template, "permissions", annotations)
   }
-//  given PageForm[Role, RoleForm] with {
-//    override def fromResource(role: Role) = RoleForm(role.name, role.permissions.map(_.id.toString))
-//  }
 
 case class RolesPage(path: String, db: String) extends CrudPage[RoleRepository & PermissionRepository, Role, RoleView, RoleForm]:
   val htmlId = path

@@ -12,7 +12,7 @@ import fi.kimmoeklund.domain.CrudResource
 import fi.kimmoeklund.domain.ErrorCode
 
 trait CrudPage[R, A, B <: Identifiable, C] extends Page[R, CrudResource[A, C], B]:
-  val attributes = (idAttr := "resource-table-body") //++ (PartialAttribute("hx-swap-oob") := "beforeend");
+  val attributes = (idAttr := "resource-table-body")
 
   private def tableRow(r: CrudResource[A,C])(using htmlEncoder: HtmlEncoder[C]) =  
       Html.fromDomElement(tBody(attributes,

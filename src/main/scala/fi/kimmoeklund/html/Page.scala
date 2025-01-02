@@ -38,7 +38,6 @@ trait Page[-R, A, B <: Identifiable](using htmlEncoder: HtmlEncoder[B]):
   def mapToView: A => B
   def listItems: ZIO[Map[String, R], ErrorCode, Seq[A]]
   def upsertResource(req: Request): ZIO[Map[String, R], ErrorCode, Html]
-//  def update(req: Request): ZIO[Map[String, R], ErrorCode, Html]
   def delete(id: String): ZIO[Map[String, R], ErrorCode, Unit]
   def optionsList(selected: Option[Seq[String]] = None): ZIO[Map[String, R], ErrorCode, Html]
 

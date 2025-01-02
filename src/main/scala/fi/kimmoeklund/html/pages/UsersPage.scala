@@ -20,8 +20,6 @@ object UserView:
     UserView(u.id, u.name, u.roles, u.logins)
   given HtmlEncoder[UserView] = HtmlEncoder.derived[UserView]
 
-//private case class FormAndEffect(form: ValidUserForm, effect: ZIO[UserRepository, ErrorCode, User])
-
 case class UsersPage(path: String, db: String)
     extends CrudPage[UserRepository & RoleRepository, User, UserView, UserForm]:
 
@@ -104,23 +102,6 @@ case class UsersPage(path: String, db: String)
           .foldCause(foldErrors(form), foldSuccess)
       })
   }
-
-//  def update(req: Request) = {
-//    val parsedForm = parseForm(req)
-//    parsedForm
-//      .orElseFail(FormError.ProcessingFailed("System error, unable to parse form"))
-//      .flatMap(form => {
-//        (for {
-//          userRepo  <- ZIO.serviceAt[UserRepository](db)
-//          validForm <- FormValidators.updateUser(form).toZIO
-//          user <- userRepo.get
-//            .updateUser(User(validForm.id, validForm.name, Seq.empty, Seq.empty))
-//            .mapError(mapExistingEntityError(_, "user"))
-//        } yield (user))
-//          .mapError(mapFormError)
-//          .foldCause(foldErrors(form), foldSuccess)
-//      })
-//  }
 
   override def delete(id: String): ZIO[Map[String, UserRepository], ErrorCode, Unit] = {
     for {
