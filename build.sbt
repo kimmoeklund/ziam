@@ -4,7 +4,7 @@ val quillVersion = "4.8.1"
 val testContainersVersion = "0.40.11"
 val zioVersion = "2.0.11"
 val zioMockVersion = "1.0.0-RC8"
-ThisBuild / scalaVersion := "3.3.1"
+ThisBuild / scalaVersion := "3.3.4"
 ThisBuild / organization := "fi.kimmoeklund"
 
 ThisBuild / assemblyMergeStrategy := {
