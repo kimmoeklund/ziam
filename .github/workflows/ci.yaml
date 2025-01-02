@@ -12,6 +12,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 11
+          cache: 'sbt'
       - name: Make default db folder
         run: mkdir -p databases
       - name: Build and Test
