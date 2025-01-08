@@ -1,0 +1,39 @@
+@import fi.kimmoeklund.html.CrudPageParams
+@(p: CrudPageParams, table: Html, form: Html, editMode: Boolean)
+@hidable_panel(form, p.resourcePath, editMode)
+<div class="min-h-full">
+  <div class="px-4 sm:px-6 lg:px-8 z-10">
+    <div class="sm:flex sm:items-center">
+      <div class="sm:flex-auto">
+        <h1 class="text-base font-semibold leading-6 text-gray-900">@p.description
+        </p>
+      </div>
+      <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+        <a id="add-resource-button" href="/@p.resourcePath/new"
+          class="block rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">@p.addButtonLabel
+        </a>
+      </div>
+    </div>
+    <div>
+      <div class="mt-8 flow-root">
+        <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+          <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+            @table
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  $('#add-resource-panel-clear').on("click", function () {
+    $("#form").trigger("reset");
+    $("#form :input:enabled:visible:first").focus();
+  });
+//  $("#add-resource-button").on("click", function () {
+//    $("#add-resource-panel").removeClass("hidden");
+//  });
+//  $("#add-resource-panel-close, #add-resource-panel-cancel").on("click", function () {
+//    $("#add-resource-panel").addClass("hidden");
+//  });
+</script>

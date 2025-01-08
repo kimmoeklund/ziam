@@ -1,4 +1,4 @@
-package fi.kimmoeklund.service
+package fi.kimmoeklund.repository
 
 import io.getquill.jdbczio.Quill
 import io.getquill.*
@@ -6,36 +6,31 @@ import fi.kimmoeklund.domain.*
 import zio.* 
 import java.util.UUID
 import java.sql.SQLException
+import MappedEncodings.given
 
-trait RoleRepository:
-  def deleteRole(id: UUID): IO[ErrorCode, Unit]
-  def updateUserRoles: IO[ErrorCode, Option[User]]
-  def getRoles: IO[ExistingEntityError, Seq[Role]]
-  def getRolesByIds(ids: Set[RoleId]): IO[ExistingEntityError, Set[Role]]
-  def addRole(role: Role): IO[ErrorCode, Role]
+type RoleRepository = Repository[Role, RoleId]
 
-final class RoleRepositoryLive(
-    quill: Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]) extends RoleRepository with RepositoryUtils:
-  import quill.*
-  
+final class RoleRepositoryLive extends RoleRepository:
   private def mapRoles(roles: Seq[(Roles, Option[PermissionGrants], Option[Permissions])]) =
     val permissionsMap = roles.groupMap(_._1)(_._3)
     roles
       .map(r =>
         Role(
-          RoleId(r._1.id),
+          r._1.id,
           r._1.name,
-          permissionsMap(r._1).flatten.map(p => Permission(p.id, p.target, p.permission))
+          Set.from(permissionsMap(r._1).flatten.map(p => Permission(p.id, p.target, p.permission)))
         )
       )
       .distinct
 
-  override def deleteRole(id: UUID): IO[ErrorCode, Unit] =
+  override def delete(using quill: QuillCtx)(id: RoleId): IO[ErrorCode, Unit] =
+    import quill.*
     run {
       query[Roles].filter(r => r.id == lift(id)).delete
     }.mapBoth(e => GeneralError.Exception(e.getMessage), _ => ())
 
-  override def getRoles: IO[ExistingEntityError, Seq[Role]] = {
+  override def getList(using quill: QuillCtx): IO[ExistingEntityError, Seq[Role]] = {
+    import quill.*
     run {
       for {
         roles <- query[Roles]
@@ -48,7 +43,8 @@ final class RoleRepositoryLive(
     )
   }
 
-  override def getRolesByIds(ids: Set[RoleId]): IO[ExistingEntityError, Set[Role]] =
+  override def getByIds(using quill: QuillCtx)(ids: Set[RoleId]): IO[ExistingEntityError, Set[Role]] =
+    import quill.*
     val uuids = ids.map(RoleId.unwrap)
     run {
       for {
@@ -65,8 +61,9 @@ final class RoleRepositoryLive(
         case e: ExistingEntityError => e
       })
 
-  override def addRole(role: Role): IO[ErrorCode, Role] =
-    val newRole = Roles(RoleId.unwrap(role.id), role.name)
+  override def add(using quill: QuillCtx)(role: Role): IO[ErrorCode, Role] =
+    import quill.*
+    val newRole = Roles(role.id, role.name)
     transaction {
       for {
         _ <-
@@ -75,7 +72,7 @@ final class RoleRepositoryLive(
           run {
             liftQuery(role.permissions).foreach(p =>
               query[PermissionGrants].insertValue(
-                PermissionGrants(lift(RoleId.unwrap(role.id)), p.id)
+                PermissionGrants(lift(newRole.id), p.id)
               )
             )
           }
@@ -85,21 +82,5 @@ final class RoleRepositoryLive(
       r => role
     )
 
-  override def updateUserRoles: IO[ErrorCode, Option[User]] = ???
-
-object RoleRepositoryLive:
-  def sqliteLayer(keys: Seq[String]): ZLayer[
-    Map[String, Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]],
-    Nothing,
-    Map[String, RoleRepository]
-  ] = {
-    val repos = ZIO
-      .foreach(keys) { key =>
-        for {
-          quill <- ZIO.serviceAt[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]](key)
-        } yield (key, RoleRepositoryLive(quill.get).asInstanceOf[RoleRepository])
-      }
-      .map(t => ZEnvironment(t.toMap))
-    ZLayer.fromZIOEnvironment(repos)
-  }
+  override def update(using quill: QuillCtx)(role: Role) = ???
 

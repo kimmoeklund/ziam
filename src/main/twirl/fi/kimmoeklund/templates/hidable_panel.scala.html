@@ -1,0 +1,16 @@
+@(formContent: Html, resourcePath: String, showForm: Boolean)
+<!-- hidable-panel.scala.html -->
+<div id="resource-form">
+  <div class="relative z-10" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+    <!-- Background backdrop, show/hide based on slide-over state. -->
+    <div class="@if(showForm) {} else {hidden} fixed inset-0 overflow-hidden" id="add-resource-panel">
+      <div class="absolute inset-0 overflow-hidden">
+        <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10 sm:pl-16">
+          <div id="add-resource-panel-inner" class="pointer-events-auto w-screen max-w-md">
+            @crud_form(formContent, resourcePath, showForm)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

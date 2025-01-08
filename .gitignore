@@ -1,3 +1,4 @@
+**/metals.sbt
 target
 .bloop
 .idea
@@ -6,3 +7,4 @@ target
 .vscode
 .metals
 node_modules
+**/todo.txt

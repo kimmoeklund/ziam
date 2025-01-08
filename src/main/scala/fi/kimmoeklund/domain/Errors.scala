@@ -1,6 +1,6 @@
 package fi.kimmoeklund.domain
 
-type Errors = List[ErrorCode]
+case class FormWithErrors[A](errors: List[ErrorCode], form: Option[A])
 
 sealed trait ErrorCode
 
@@ -10,7 +10,7 @@ sealed trait FieldError:
 enum GeneralError extends ErrorCode {
   case Exception(e: String)
   case EntityNotFound[A](id: String)
-  case UniqueKeyViolation(fieldName: String) 
+  case UniqueKeyViolation(fieldName: String)
   case IncorrectPassword
   case DbNotFound
   case PageNotFound

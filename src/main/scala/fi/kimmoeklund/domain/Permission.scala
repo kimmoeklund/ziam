@@ -1,33 +1,44 @@
 package fi.kimmoeklund.domain
 
-import fi.kimmoeklund.html.{HtmlEncoder, Identifiable}
 import zio.json.*
 
 import java.util.UUID
-import fi.kimmoeklund.html.ElementTemplate
-import fi.kimmoeklund.html.ErrorMsg
-import fi.kimmoeklund.html.pages.PermissionForm
+import fi.kimmoeklund.domain.Identifiable
+import fi.kimmoeklund.html.pages.PermissionForm 
+import scala.meta.common.Convert
+import zio.prelude.Newtype
+import scala.util.Try
+import fi.kimmoeklund.html.inputNumber
+import io.github.arainko.ducktape.Transformer
 
-case class Permission(id: UUID, target: String, permission: Int) extends Identifiable with Ordered[Permission] with CrudResource[Permission, PermissionForm] {
+object PermissionId extends Newtype[UUID]:
+  given Convert[PermissionId, String] with
+    def apply(permissionId: PermissionId): String = permissionId.toString
+  given Convert[Set[PermissionId], String] with
+    def apply(permissionIds: Set[PermissionId]): String = permissionIds.mkString(",")
+  given Convert[String, Option[PermissionId]] with 
+    def apply(permissionId: String): Option[PermissionId] = 
+      Try(java.util.UUID.fromString(permissionId)).toOption.map(PermissionId(_))   
+  given Transformer[UUID, PermissionId] = uuid => PermissionId(uuid)
+  def create: PermissionId = PermissionId(java.util.UUID.randomUUID())
+  extension (permissionId: PermissionId)
+    def compare(that: PermissionId) = PermissionId.unwrap(permissionId).toString() compare PermissionId.unwrap(that).toString
+
+type PermissionId = PermissionId.Type
+
+case class Permission(id: PermissionId, target: String, permission: Int)
+    extends Identifiable
+    with Ordered[Permission]
+    with CrudResource[PermissionForm] {
   import scala.math.Ordered.orderingToOrdered
   def compare(that: Permission): Int = this.id compare that.id
-  def form = PermissionForm(this.target, this.permission)
-  def resource = this
+  val form                           = PermissionForm(this.target, this.permission)
 }
 
 object Permission:
   given JsonEncoder[Permission] = DeriveJsonEncoder.gen[Permission]
   given JsonDecoder[Permission] = DeriveJsonDecoder.gen[Permission]
-  given HtmlEncoder[Permission] = HtmlEncoder.derived[Permission]
-  given HtmlEncoder[Seq[Permission]] with {
-    override def encodeValues(
-        template: ElementTemplate,
-        value: Seq[Permission],
-        errors: Option[Seq[ErrorMsg]],
-        paramName: Option[String],
-        annotations: Seq[Any]
-    ) =
-      HtmlEncoder[String].encodeValues(template, value.map(v => s"${v.target} (${v.permission})").mkString("<br>"))
-    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[Seq[Permission]]) =
-      HtmlEncoder[String].encodeParams(template, "permissions", annotations)
-  }
+  given JsonDecoder[PermissionId] = JsonDecoder[UUID].map(PermissionId(_))
+  given JsonEncoder[PermissionId] = JsonEncoder[UUID].contramap(PermissionId.unwrap)
+  given Convert[Set[Permission], String] with 
+    def apply(permissions: Set[Permission]) =  permissions.map(p => s"${p.target} (${p.permission})").mkString("<br/>")
