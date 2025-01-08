@@ -3,124 +3,96 @@ package fi.kimmoeklund.html.pages
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.domain.FormError.ValueInvalid
 import fi.kimmoeklund.html.*
+import fi.kimmoeklund.html.encoder.*
 import fi.kimmoeklund.html.forms.*
-import fi.kimmoeklund.service.{Repositories, UserRepository, RoleRepository}
+import fi.kimmoeklund.repository.*
 import io.github.arainko.ducktape.*
-import zio.*
-import zio.http.html.*
-import zio.http.{html as _, *}
+import zio.http.Request
+import zio.http.template.*
+import zio.{Cause, Chunk, ZIO}
 
 import java.util.UUID
 import scala.annotation.threadUnsafe
 
-case class UserView(id: UserId, name: String, roles: Set[Role], logins: Seq[Login]) extends Identifiable
+import fi.kimmoeklund.html.encoder.FormDecoder.given
+import play.twirl.api.HtmlFormat
+import zio.http.Path
+
+case class UserView(id: UserId, name: String, roles: Set[Role], logins: Set[Login]) extends Identifiable
 
 object UserView:
   def from(u: User) =
     UserView(u.id, u.name, u.roles, u.logins)
-  given HtmlEncoder[UserView] = HtmlEncoder.derived[UserView]
 
-case class UsersPage(path: String, db: String)
-    extends CrudPage[UserRepository & RoleRepository, User, UserView, UserForm]:
 
-  override def emptyForm = UserForm(None, None, None, None, None, None)
+case class UsersPage(path: Path, db: String, name: String)
+    extends CrudPage[UserRepositoryLive & RoleRepository, User, UserView, UserForm]:
+  override val formValueEncoder                                   = summon[ValueHtmlEncoder[UserForm]]
+  override val formPropertyEncoder                                = summon[PropertyHtmlEncoder[UserForm]]
+  override val viewValueEncoder: ValueHtmlEncoder[UserView]       = summon[ValueHtmlEncoder[UserView]]
+  override val viewPropertyEncoder: PropertyHtmlEncoder[UserView] = summon[PropertyHtmlEncoder[UserView]]
+  override val errorHandler                                       = DefaultErrorHandler(name).handle;
 
-  def mapExistingEntityError(error: ExistingEntityError, field: String): FormError = error match {
-    case a: ExistingEntityError.EntityNotFound[_] =>
-      ValueInvalid(field, s"requested $field was not found, please reload the page and try again.")
-    case _ =>
-      FormError.ProcessingFailed(s"System failure while creating user. User was not created, please try again later.")
-  }
+  def mapToView = r => UserView.from(r)
 
-  def mapInsertDataError(error: InsertDataError): FormError = error match {
-    case InsertDataError.UniqueKeyViolation("userName") =>
-      ValueInvalid("username", "Username is already taken, please select another one.")
-    case _ =>
-      FormError.ProcessingFailed(s"System failure while creating user. User was not created, please try again later.")
-  }
-
-  def mapFormError(error: ErrorCode) = error match {
-    case FormError.Missing(field) => ErrorMsg(field, s"$field is mandatory")
-    case FormError.PasswordsDoNotMatch =>
-      ErrorMsg("password_confirmation", "password confirmation does not match")
-    case ValueInvalid(field, details) => ErrorMsg(field, details)
-    case _                            => ErrorMsg("", "System error processing the form")
-  }
-
-  def parseForm(request: Request) = for {
-    form <- request.body.asURLEncodedForm
-    userForm <- ZIO.succeed(
-      UserForm.fromURLEncodedForm(
-        form.get("id"),
-        form.get("name"),
-        form.get("username"),
-        form.get("password"),
-        form.get("password_confirmation"),
-        form.get("roles")
-      )
-    )
-  } yield (userForm)
-
-  def mapToView = r => UserView.from(r.resource)
-
-  // move to a trait as can be generalized
-  def foldErrors = (form: UserForm) =>
-    (error: Cause[ErrorMsg]) =>
-      Html.fromDomElement(
-        div(
-          idAttr := "form-response",
-          htmlForm(Some(form), if error.failures.nonEmpty then Some(error.failures) else None)
-        )
-      )
-  def foldSuccess = (user: User) => newResourceHtml(user)
-
-  def createOrUpdate(form: ValidUserForm | ValidNewUserForm, userRepo: UserRepository, roles: Set[Role]) = form match
+  def createOrUpdate(using
+      QuillCtx
+  )(form: ValidUserForm | ValidNewUserForm, userRepo: UserRepositoryLive, roles: Set[Role]) = form match
     case ValidNewUserForm(id, name, roleIds, credentials) =>
       userRepo
-        .addUser(NewPasswordUser(UserId(id), name, credentials, roles))
-        .mapError(mapInsertDataError)
+        .add(NewPasswordUser(id, name, credentials, roles))
     case ValidUpdateUserForm(id, name, roleIds, newPassword) =>
       userRepo
-        .updateUser(User(id, name, roles, Seq.empty))
-        .mapError(mapExistingEntityError(_, "user"))
+        .update(User(id, name, roles, Set.empty))
 
-  def upsertResource(req: Request) = {
+  def upsertResource(using QuillCtx)(req: Request) = {
     val parsedForm = parseForm(req)
     parsedForm
-      .orElseFail(FormError.ProcessingFailed("System error, unable to parse form"))
       .flatMap(form => {
         (for {
-          userRepo <- ZIO.serviceAt[UserRepository](db)
-          roleRepo <- ZIO.serviceAt[RoleRepository](db)
+          userRepo <- ZIO.service[UserRepositoryLive]
+          roleRepo <- ZIO.service[RoleRepository]
           validForm <-
             if form.id.isEmpty then FormValidators.newUser(form).toZIO else FormValidators.updateUser(form).toZIO
-          roles <- roleRepo.get.getRolesByIds(validForm.roles)
-          user <- createOrUpdate(validForm, userRepo.get, roles)
-        } yield (user))
-          .tapErrorCause(e => ZIO.logError(s"Error: ${e.failures}, form: ${form}"))
-          .mapError(mapFormError)
-          .foldCause(foldErrors(form), foldSuccess)
+          roles <- roleRepo.getByIds(validForm.roles)
+          user  <- createOrUpdate(validForm, userRepo, roles)
+        } yield user).mapErrorCause(e => Cause.fail(FormWithErrors(e.failures, Some(form))))
       })
   }
 
-  override def delete(id: String): ZIO[Map[String, UserRepository], ErrorCode, Unit] = {
-    for {
+  def deleteInternal(using QuillCtx)(id: String) =
+    (for {
       userId <- ZIO.attempt(UserId(UUID.fromString(id))).orElseFail(ValueInvalid("id", "unable to parse as UUID"))
-      repo   <- ZIO.serviceAt[UserRepository](db)
-      _      <- repo.get.deleteUser(userId)
-    } yield ()
-  }
+      repo   <- ZIO.service[UserRepositoryLive]
+      _      <- repo.delete(userId)
+    } yield ()).mapError(errorHandler(_))
 
-  override def get(id: String) = for {
+  def get(using QuillCtx)(id: String) = (for {
     userId  <- ZIO.attempt(UserId(UUID.fromString(id))).orElseFail(ValueInvalid("id", "unable to parse as UUID"))
-    repo    <- ZIO.serviceAt[UserRepository](db)
-    userOpt <- repo.get.getUsers(Some(userId)).map(_.headOption)
+    repo    <- ZIO.service[UserRepositoryLive]
+    userOpt <- repo.getList(Some(userId)).map(_.headOption)
     user    <- ZIO.fromOption(userOpt).orElseFail(ExistingEntityError.EntityNotFound(id))
-  } yield (user)
+  } yield (user)).mapError(errorHandler(_))
 
-  override def optionsList(selected: Option[Seq[String]] = None) = ???
+  override def renderAsOptions(using QuillCtx)(selected: Chunk[String] = Chunk.empty) =
+    listItems
+      .map(users =>
+        Html.fromSeq(
+          users.map(user =>
+            option(
+              user.name,
+              valueAttr := user.id.toString,
+              if selected.contains(UserId.unwrap(user.id).toString) then selectedAttr := "true"
+              else emptyHtml
+            )
+          )
+        )
+      )
+      .map(h => HtmlFormat.raw(h.encode.toString))
+      .mapError(errorHandler(_))
 
-  def listItems = for {
-    repo  <- ZIO.serviceAt[UserRepository](db)
-    users <- repo.get.getUsers(None)
+  def listItems(using QuillCtx) = for {
+    repo  <- ZIO.service[UserRepositoryLive]
+    users <- repo.getList(None)
+
   } yield users

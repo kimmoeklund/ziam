@@ -1,9 +1,10 @@
 package fi.kimmoeklund.html.forms
 
 import fi.kimmoeklund.html.*
-import zio.http.html.*
+import fi.kimmoeklund.html.encoder.*
+import zio.http.template.*
 
-private def inputElement(annotation: Option[Any], attrs: Seq[Html], value: Option[String] = None) =
+private def inputElement(site: String, annotation: Option[Any], attrs: Seq[Html], value: Option[String] = None) =
   (annotation, value) match {
     case (Some(_: inputEmail), _) =>
       input(
@@ -13,12 +14,12 @@ private def inputElement(annotation: Option[Any], attrs: Seq[Html], value: Optio
       input(
         attrs.appended(typeAttr := "password").appended(valueAttr := value.getOrElse("")): _*
       )
-    case (Some(o: inputSelectOptions), v) => 
-      selectOption(s"${o.path}", o.name, v.map(valueString => valueString.split(",")), o.selectMultiple)
+    case (Some(o: inputSelectOptions), v) =>
+      selectOption(s"/$site${o.path}", o.name, v.map(valueString => valueString.split(",").toSeq).getOrElse(Seq.empty), o.selectMultiple)
     case (Some(_: inputHidden), Some(v)) if v != "" =>
-      input(attrs.appended(typeAttr := "hidden").appended(valueAttr := value.get): _*)      
+      input(attrs.appended(typeAttr := "hidden").appended(valueAttr := value.get): _*)
     case (Some(_: inputHidden), _) =>
-      Dom.empty 
+      Dom.empty
     case (_, _) =>
       input(
         attrs.appended(typeAttr := "text").appended(valueAttr := value.getOrElse("")): _*
@@ -27,32 +28,31 @@ private def inputElement(annotation: Option[Any], attrs: Seq[Html], value: Optio
 
 private def inputLabel(paramName: String, annotation: Option[Any], attrs: Html) =
   annotation match {
-    case Some(_:inputHidden) => Dom.empty
-    case Some(_) => label(paramName, forAttr := paramName, attrs)
-    case None    => label(paramName, forAttr := paramName, attrs)
+    case Some(_: inputHidden) => Dom.empty
+    case Some(_)              => label(paramName, forAttr := paramName, attrs)
+    case None                 => label(paramName, forAttr := paramName, attrs)
   }
 
-private def withErrors(paramName: String, value: Option[String]) =
-  inputElement(None, Seq(Tailwind.formInputError, nameAttr := paramName), value)
+private def withErrors(site: String, paramName: String, value: Option[String]) =
+  inputElement(site, None, Seq(Tailwind.formInputError, nameAttr := paramName), value)
 
-private def withErrorsAnnotated(annotation: Option[Any], paramName: String, value: Option[String]) =
-  inputElement(annotation, Seq(Tailwind.formInputError, nameAttr := paramName), value)
+private def withErrorsAnnotated(site: String, annotation: Option[Any], paramName: String, value: Option[String]) =
+  inputElement(site, annotation, Seq(Tailwind.formInputError, nameAttr := paramName), value)
 
-private def withDefaults(annotation: Option[Any], paramName: String, value: Option[String]) =
-  inputElement(annotation, Seq(Tailwind.formInput, nameAttr := paramName), value)
+private def withDefaults(site: String, annotation: Option[Any], paramName: String, value: Option[String]) =
+  inputElement(site, annotation, Seq(Tailwind.formInput, nameAttr := paramName), value)
 
-def formTemplate = (in: TemplateInput) =>
-  Html.fromDomElement(
-    div(
+def formTemplate(site: String) = (in: TemplateInput[String]) =>
+    play.twirl.api.Html(div(
       inputLabel(in.paramName.capitalize, in.annotations.headOption, Tailwind.formLabel),
       div(
-        classAttr := "mt-2" :: Nil,
+        classAttr := "mt-2",
         // format: off
         in match
-          case TemplateInput(value, Some(errors), param, Nil) => Seq(withErrors(param, value)) ++ errors.map(e => p(e, Tailwind.errorMsg))
-          case TemplateInput(value, Some(errors), param, annotations) => Seq(withErrorsAnnotated(annotations.headOption, param, value)) ++ errors.map(e => p(e, Tailwind.errorMsg))
-          case TemplateInput(value, None, param, annotations) => withDefaults(annotations.headOption, param, value)
+          case TemplateInput(value, Some(errors), param, Nil) => Seq(withErrors(site, param, value)) ++ errors.map(e => p(e, Tailwind.errorMsg))
+          case TemplateInput(value, Some(errors), param, annotations) => Seq(withErrorsAnnotated(site, annotations.headOption, param, value)) ++ errors.map(e => p(e, Tailwind.errorMsg))
+          case TemplateInput(value, None, param, annotations) => withDefaults(site, annotations.headOption, param, value)
         // format: on
       )
-    )
+    ).encode.toString
   )

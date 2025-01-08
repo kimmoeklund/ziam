@@ -1,9 +1,9 @@
-val zioLoggingVersion = "2.1.9"
+val zioLoggingVersion = "2.4.0"
 val logbackClassicVersion = "1.4.4"
-val quillVersion = "4.8.1"
+val quillVersion = "4.8.6"
 val testContainersVersion = "0.40.11"
-val zioVersion = "2.0.11"
-val zioMockVersion = "1.0.0-RC8"
+val zioVersion = "2.1.14"
+val zioMockVersion = "1.0.0-RC12"
 ThisBuild / scalaVersion := "3.3.4"
 ThisBuild / organization := "fi.kimmoeklund"
 
@@ -18,8 +18,8 @@ ThisBuild / assemblyMergeStrategy := {
 
 libraryDependencies ++= Seq(
   "dev.zio" %% "zio" % zioVersion,
-  "dev.zio" %% "zio-json" % "0.3.0-RC11",
-  "dev.zio" %% "zio-http" % "3.0.0-RC2",
+  "dev.zio" %% "zio-json" % "0.7.4",
+  "dev.zio" %% "zio-http" % "3.0.1",
   "dev.zio" %% "zio-logging" % zioLoggingVersion,
   "io.getquill" %% "quill-zio" % quillVersion,
   "io.getquill" %% "quill-jdbc-zio" % quillVersion,
@@ -43,3 +43,5 @@ assembly / mainClass := Some("fi.kimmoeklund.ziam.Main")
 assembly / assemblyJarName := "ziam.jar"
 Compile / selectMainClass := Some("fi.kimmoeklund.ziam.Main")
 reStart / mainClass := Some("fi.kimmoeklund.ziam.Main")
+
+lazy val root = (project in file(".")).enablePlugins(SbtTwirl)

@@ -1,0 +1,5 @@
+@import fi.kimmoeklund.html.encoder.TemplateInput
+@(resourcePath: String, resourceId: String)
+<!-- crud_table_row_buttons.scala.html -->
+<td><a class="btn" href="/@resourcePath/?id=@resourceId">Edit</a></td>
+<td><button class="btn btn-danger" hx-delete="/@resourcePath/@resourceId" hx-target="closest tr" hx-swap="outerHTML">Delete</button></td>

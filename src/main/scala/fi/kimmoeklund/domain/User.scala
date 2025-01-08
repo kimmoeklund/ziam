@@ -1,17 +1,14 @@
 package fi.kimmoeklund.domain
 
-import fi.kimmoeklund.html.{HtmlEncoder, Identifiable}
+import fi.kimmoeklund.html.forms.UserForm
 import zio.json.*
-import zio.prelude.Validation
+import zio.prelude.{Newtype, Validation}
 import zio.schema.codec
 
 import java.util.UUID
-import zio.http.html.Template
-import fi.kimmoeklund.html.ElementTemplate
-import fi.kimmoeklund.html.ErrorMsg
-import zio.prelude.Newtype
-import zio.http.html.Html
-import fi.kimmoeklund.html.forms.UserForm
+import play.twirl.api.Html
+import scala.meta.common.Convert
+import scala.util.Try
 
 sealed trait Member
 
@@ -20,37 +17,27 @@ enum LoginType {
 }
 
 object UserId extends Newtype[UUID]:
-  given HtmlEncoder[UserId] with {
-    override def encodeValues(
-        template: ElementTemplate,
-        value: UserId,
-        errors: Option[Seq[ErrorMsg]],
-        paramName: Option[String],
-        annotations: Seq[Any]
-    ): List[Html] = HtmlEncoder[String].encodeValues(template, value.toString(), errors, paramName, annotations)
-    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[UserId]) =
-      HtmlEncoder[String].encodeParams(template, "id", annotations)
-  }
-  given HtmlEncoder[Seq[UserId]] with {
-    override def encodeValues(
-        template: ElementTemplate,
-        value: Seq[UserId],
-        errors: Option[Seq[ErrorMsg]],
-        paramName: Option[String],
-        annotations: Seq[Any]
-    ) =
-      HtmlEncoder[String].encodeValues(template, value.map(UserId.unwrap).mkString(","), errors, paramName, annotations)
-    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[Seq[UserId]]) =
-      HtmlEncoder[UUID].encodeParams(template, "ids")
-  }
-
+  given Convert[UserId, String] with 
+    def apply(userId: UserId): String = userId.toString
+  given Convert[String, Option[UserId]] with 
+    def apply(userId: String): Option[UserId] = 
+      Try(java.util.UUID.fromString(userId)).toOption.map(UserId(_))
+  def create: UserId = UserId(java.util.UUID.randomUUID())
 type UserId = UserId.Type
 
 case class Login(userName: String, loginType: LoginType)
 
-case class User(id: UserId, name: String, roles: Set[Role], logins: Seq[Login]) extends Member with CrudResource[User, UserForm]:
-  override def form = UserForm(Some(this.id), Some(this.name),  this.logins.headOption.map(_.userName), None, None, Some(this.roles.map(_.id)))
-  override def resource = this
+case class User(id: UserId, name: String, roles: Set[Role], logins: Set[Login])
+    extends Member
+    with CrudResource[UserForm]:
+  override val form = UserForm(
+    Some(this.id),
+    Some(this.name),
+    this.logins.headOption.map(_.userName),
+    None,
+    None,
+    Some(this.roles.map(_.id))
+  )
 
 case class NewPasswordUser(
     id: UserId,
@@ -79,23 +66,18 @@ object Login:
   given JsonDecoder[LoginType] = DeriveJsonDecoder.gen[LoginType]
   given JsonEncoder[Login]     = DeriveJsonEncoder.gen[Login]
   given JsonDecoder[Login]     = DeriveJsonDecoder.gen[Login]
-  given [A: HtmlEncoder]: HtmlEncoder[Seq[Login]] with {
-    override def encodeValues(
-        template: ElementTemplate,
-        value: Seq[Login],
-        errors: Option[Seq[ErrorMsg]],
-        paramName: Option[String],
-        annotations: Seq[Any]
-    ) =
-      HtmlEncoder[String].encodeValues(template, value.map(v => s"${v.loginType} (${v.userName})").mkString("<br>"))
-    override def encodeParams(template: ElementTemplate, paramName: String, annotations: Seq[Any], value: Option[Seq[Login]]) =
-      HtmlEncoder[String].encodeParams(template, "logins")
-  }
-  given HtmlEncoder[Login]     = HtmlEncoder.derived[Login]
-  given HtmlEncoder[LoginType] = HtmlEncoder.derived[LoginType]
+  given Convert[Login, String] with 
+    def apply(login: Login) = s"${login.userName} (${login.loginType})"
+  given Convert[Set[Login], String] with 
+    def apply(logins: Set[Login]) = logins.mkString(",")
 
 object User:
-  given JsonEncoder[User] = DeriveJsonEncoder.gen[User]
-  given JsonDecoder[User] = DeriveJsonDecoder.gen[User]
+  given JsonEncoder[User]   = DeriveJsonEncoder.gen[User]
+  given JsonDecoder[User]   = DeriveJsonDecoder.gen[User]
   given JsonDecoder[UserId] = JsonDecoder[UUID].map(UserId(_))
   given JsonEncoder[UserId] = JsonEncoder[UUID].contramap(UserId.unwrap)
+  given Convert[Login, String] with
+    def apply(login: Login): String = s"${login.loginType} (${login.userName})"
+  given [A](using conv: Convert[A, String]): Convert[Seq[A], String] with
+    def apply(seq: Seq[A]): String = 
+      seq.map(summon[Convert[A, String]].apply).mkString("<br>")
