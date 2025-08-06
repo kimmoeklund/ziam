@@ -48,9 +48,9 @@ def selectOption(
     nameAttr  := name,
     PartialAttribute("hx-get") := s"$optsPath${QueryParams(Map.from(Seq("selected" -> Chunk.fromIterable(selected)))).encode}",
     PartialAttribute("hx-trigger") := "load",
-    PartialAttribute("hx-swap")   := "innerHTML",
-    PartialAttribute("hx-target") := s"#$name",
-    PartialAttribute("hx-select") := "*",
+    PartialAttribute("hx-swap")    := "innerHTML",
+    PartialAttribute("hx-target")  := s"#$name",
+    PartialAttribute("hx-select")  := "*",
     option(valueAttr := "loading..")
   )
   val selectElements = if (selectMultiple) baseElements ++ Chunk[Html](multipleAttr := "true") else baseElements
