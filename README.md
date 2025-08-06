@@ -8,7 +8,7 @@ Ziam is project for me to learn ZIO and FP in a selected domain.
 
 ## Domain
 
-Simple "multi-tentant" crud app, but with linked resources and relational db schema. Multi-tenancy here means ability run several "sites", each with their own database.
+Simple "multi-tentant" crud app, but with linked resources and relational db schema and fetch linked resources with SQL joins. Multi-tenancy here means ability run several "sites", each with their own database.
 
 ## Features
 
