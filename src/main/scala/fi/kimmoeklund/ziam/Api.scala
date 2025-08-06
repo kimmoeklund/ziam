@@ -18,7 +18,7 @@
 //        userName <- ZIO.fromTry(Try(form.get("username").get.stringValue.get))
 //        password <- ZIO.fromTry(Try(form.get("password").get.stringValue.get))
 //        user     <- repo.get.checkUserPassword(userName, password)
-//        response <- ZIO.succeed(Response.json(user.toJson)) 
+//        response <- ZIO.succeed(Response.json(user.toJson))
 //      } yield response
 //      effect.catchAll(_ => ZIO.succeed(Response.status(Status.Unauthorized)))
 //      effect.foldZIO(

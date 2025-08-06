@@ -33,8 +33,13 @@ object DataSourceLayer:
   def quill = for {
     dataSources <- ZIO.service[Map[String, DataSource]]
     quills <- ZIO.foreach(dataSources) { case (k, v) =>
-      ZIO.succeed((k, Sqlite(NamingStrategy(SnakeCase, Escape), v)
-        .asInstanceOf[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]]))
+      ZIO.succeed(
+        (
+          k,
+          Sqlite(NamingStrategy(SnakeCase, Escape), v)
+            .asInstanceOf[Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]]
+        )
+      )
     }
   } yield (quills)
 

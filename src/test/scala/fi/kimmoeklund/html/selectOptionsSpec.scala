@@ -7,6 +7,6 @@ object selectOptionsSpec extends ZIOSpecDefault {
     test("it add query parameters for hx-get") {
       val selectOptions = selectOption("path", "name", Seq("1", "2")).encode.toString()
       assertTrue(selectOptions.contains("hx-get=\"path?selected=1&ampselected=2\""))
-    },
+    }
   )
 }

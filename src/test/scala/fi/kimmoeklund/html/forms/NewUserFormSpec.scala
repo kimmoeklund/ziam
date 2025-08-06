@@ -28,7 +28,7 @@ object NewUserFormSpec extends ZIOSpecDefault {
             None,
             Some("password"),
             Some("password_confirmation"),
-            None,
+            None
           )
         )
         .fold(
@@ -58,6 +58,6 @@ object NewUserFormSpec extends ZIOSpecDefault {
           },
           _ => assertTrue(false)
         )
-    },
+    }
   )
 }

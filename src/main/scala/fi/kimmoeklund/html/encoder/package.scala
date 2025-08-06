@@ -26,6 +26,5 @@ given Convert[Int, String] with
 given Convert[java.util.UUID, String] with
   def apply(uuid: java.util.UUID): String = uuid.toString
 
-
 given Convert[String, Option[java.util.UUID]] with
   def apply(str: String): Option[java.util.UUID] = Try(java.util.UUID.fromString(str)).toOption

@@ -42,17 +42,21 @@ object Cli extends ZIOCliDefault {
     val effect = for {
       quill <- ZIO.service[Map[String, QuillCtx]]
       repo  <- ZIO.service[UserRepositoryLive]
-      user <- ZIO.fromOption(quill.get(database).map(quillCtx => {
-        given QuillCtx = quillCtx 
-        repo.add(
-          NewPasswordUser(
-            UserId(UUID.randomUUID()),
-            "database admin",
-            NewPasswordCredentials(username, password),
-            Set()
-          )
-        )
-      }))
+      user <- ZIO.fromOption(
+        quill
+          .get(database)
+          .map(quillCtx => {
+            given QuillCtx = quillCtx
+            repo.add(
+              NewPasswordUser(
+                UserId(UUID.randomUUID()),
+                "database admin",
+                NewPasswordCredentials(username, password),
+                Set()
+              )
+            )
+          })
+      )
     } yield ()
     effect.provide(quillLayer, repoLayer, dsLayer, dbNameLayer, Argon2.passwordFactory, DbManagementLive.live)
   }

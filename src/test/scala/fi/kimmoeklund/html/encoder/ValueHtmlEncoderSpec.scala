@@ -12,24 +12,26 @@ import fi.kimmoeklund.html.encoder.ErrorMsg
 import fi.kimmoeklund.html.encoder.errorMsgs
 import play.twirl.api.HtmlFormat
 
-given ValueHtmlEncoder[TestEnum] = ValueHtmlEncoder.derived[TestEnum]
-given ValueHtmlEncoder[DataOpt] = ValueHtmlEncoder.derived[DataOpt]
-given ValueHtmlEncoder[Data] = ValueHtmlEncoder.derived[Data]
+given ValueHtmlEncoder[TestEnum]      = ValueHtmlEncoder.derived[TestEnum]
+given ValueHtmlEncoder[DataOpt]       = ValueHtmlEncoder.derived[DataOpt]
+given ValueHtmlEncoder[Data]          = ValueHtmlEncoder.derived[Data]
 given ValueHtmlEncoder[AnnotatedData] = ValueHtmlEncoder.derived[AnnotatedData]
-given ValueHtmlEncoder[AnnotatedOpt] = ValueHtmlEncoder.derived[AnnotatedOpt]
+given ValueHtmlEncoder[AnnotatedOpt]  = ValueHtmlEncoder.derived[AnnotatedOpt]
 
 object ValueValueHtmlEncoderSpec extends ZIOSpecDefault:
   import fi.kimmoeklund.html.encoder.given
-  def mapAnnotations(in: TemplateInput[String]) = 
-          in.annotations
-            .map({
-              case a: testAnnotation          => "testAnnotation"
-              case b: testAnnotationWithValue => b.data
-            }).mkString(" ")
-  val tdTemplate = (in: TemplateInput[String]) => HtmlFormat.raw(s"<td>${in.value.getOrElse(in.value)}</td>")  
-  val tdParamsTemplate = (in: TemplateInput[String]) =>  HtmlFormat.raw(s"<td>${in.paramName}</td>")
-  val annotationTemplate = (in: TemplateInput[String]) => HtmlFormat.raw(s"<td class=\"${mapAnnotations(in)}\">${in.value.getOrElse(in.paramName)}</td>")
-  val data = Data("value", 42)
+  def mapAnnotations(in: TemplateInput[String]) =
+    in.annotations
+      .map({
+        case a: testAnnotation          => "testAnnotation"
+        case b: testAnnotationWithValue => b.data
+      })
+      .mkString(" ")
+  val tdTemplate       = (in: TemplateInput[String]) => HtmlFormat.raw(s"<td>${in.value.getOrElse(in.value)}</td>")
+  val tdParamsTemplate = (in: TemplateInput[String]) => HtmlFormat.raw(s"<td>${in.paramName}</td>")
+  val annotationTemplate = (in: TemplateInput[String]) =>
+    HtmlFormat.raw(s"<td class=\"${mapAnnotations(in)}\">${in.value.getOrElse(in.paramName)}</td>")
+  val data  = Data("value", 42)
   val data2 = Data("value2", 43)
 
   val htmlEncoderSuite = suite("ValueHtmlEncoder")(
@@ -60,6 +62,7 @@ object ValueValueHtmlEncoderSpec extends ZIOSpecDefault:
       assertTrue(
         result == "<td>Bar(isHappy)</td>"
       )
-    })
+    }
+  )
 
-  override def spec = htmlEncoderSuite  
+  override def spec = htmlEncoderSuite

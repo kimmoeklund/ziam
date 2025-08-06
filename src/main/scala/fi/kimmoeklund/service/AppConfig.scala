@@ -16,5 +16,4 @@ object DbConfig {
 object Secrets {
   def cookieSecret: Config[CookieSecret] =
     Config.string("cookie_secret").withDefault("changeme").map(CookieSecret(_))
-} 
-
+}

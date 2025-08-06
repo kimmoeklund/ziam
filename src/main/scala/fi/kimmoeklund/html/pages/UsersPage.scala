@@ -24,7 +24,6 @@ object UserView:
   def from(u: User) =
     UserView(u.id, u.name, u.roles, u.logins)
 
-
 case class UsersPage(path: Path, db: String, name: String)
     extends CrudPage[UserRepositoryLive & RoleRepository, User, UserView, UserForm]:
   override val formValueEncoder                                   = summon[ValueHtmlEncoder[UserForm]]

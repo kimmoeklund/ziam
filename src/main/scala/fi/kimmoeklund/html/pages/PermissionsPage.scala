@@ -20,11 +20,11 @@ case class PermissionForm(target: String, @inputNumber permission: Int)
 
 case class PermissionsPage(path: Path, db: String, val name: String)
     extends CrudPage[PermissionRepository, Permission, Permission, PermissionForm]:
-  val errorHandler = DefaultErrorHandler("permission").handle;
-  val formPropertyEncoder  = summon[PropertyHtmlEncoder[PermissionForm]]
-  val formValueEncoder     = summon[ValueHtmlEncoder[PermissionForm]]
-  val viewPropertyEncoder  = summon[PropertyHtmlEncoder[Permission]]
-  val viewValueEncoder     = summon[ValueHtmlEncoder[Permission]]
+  val errorHandler        = DefaultErrorHandler("permission").handle;
+  val formPropertyEncoder = summon[PropertyHtmlEncoder[PermissionForm]]
+  val formValueEncoder    = summon[ValueHtmlEncoder[PermissionForm]]
+  val viewPropertyEncoder = summon[PropertyHtmlEncoder[Permission]]
+  val viewValueEncoder    = summon[ValueHtmlEncoder[Permission]]
 
   override def listItems(using QuillCtx) =
     for {
@@ -33,11 +33,13 @@ case class PermissionsPage(path: Path, db: String, val name: String)
     } yield (items)
   override def mapToView = p => p
 
-  override def upsertResource(using QuillCtx)(request: Request) = 
-    parseForm(request).flatMap(form => (for {
-    repo <- ZIO.service[PermissionRepository]
-    p    <- repo.add(Permission(PermissionId.create, form.target, form.permission))
-  } yield p).mapError(e => FormWithErrors(List(e), Some(form))))
+  override def upsertResource(using QuillCtx)(request: Request) =
+    parseForm(request).flatMap(form =>
+      (for {
+        repo <- ZIO.service[PermissionRepository]
+        p    <- repo.add(Permission(PermissionId.create, form.target, form.permission))
+      } yield p).mapError(e => FormWithErrors(List(e), Some(form)))
+    )
 
   override def deleteInternal(using QuillCtx)(id: String) = (for {
     repo <- ZIO.service[PermissionRepository]

@@ -22,4 +22,3 @@ object MappedEncodings:
   given MappedEncoding[UUID, RoleId](RoleId.apply)
   given MappedEncoding[UserId, UUID](UserId.unwrap)
   given MappedEncoding[UUID, UserId](UserId.apply)
-
