@@ -78,6 +78,7 @@ object Site {
     val pages = Seq(usersPage, rolesPage, permissionsPage)
     val pageRoutes = pages.flatMap(buildPageRoutes(pages, _, db))
     val loginPage = DefaultLoginPage("login", "logout", db, cookieSecret);
+    // login routes omitted atm, and there's no cookie check
     val loginRoutes =
       Chunk(
         Method.POST / db / loginPage.loginPath -> handler { (request: Request) =>
