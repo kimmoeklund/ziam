@@ -1,6 +1,6 @@
 # ziam
 
-Ziam is project for me to learn ZIO and FP in a selected domain. This may become a real project, probably not.
+Ziam is project for me to learn ZIO and FP in a selected domain. 
 
 ## Status
 
@@ -37,7 +37,7 @@ Ziam's domain is fine grained authorization which you might find usefull in foll
 Application needs one or more databases to run. You can create a new database with the CLI:
 
 ```shell
-./ziam.sh create --database new.db --username admin --password admin
+./ziam.sh create --database newdb --username admin --password admin
 ```
 
 Once you have one or more databases created, run the application:
@@ -46,7 +46,7 @@ Once you have one or more databases created, run the application:
 sbt run
 ```
 
-Application will start on `http://localhost:8080/<dbname-without-extension>`, i.e [http://localhost:8080/new](http://localhost:8080/new)
+Application will start on `http://localhost:8080/<dbname-without-extension>`, i.e [http://localhost:8080/newdb](http://localhost:8080/newdb)
 
 ### Running tests
 
