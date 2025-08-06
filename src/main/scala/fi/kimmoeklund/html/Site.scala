@@ -63,9 +63,9 @@ object Site {
   def layer = for {
     cookieSecret <- ZIO.config(Secrets.cookieSecret)
     db           <- ZIO.service[Map[String, QuillCtx]]
-    sites <- ZIO.succeed(db.toList.map({ case (key, value) =>
-      given QuillCtx = value
-      Site.build(key, cookieSecret)
+    sites <- ZIO.succeed(db.toList.map({ case (dbName, quillCtx) =>
+      given QuillCtx = quillCtx
+      Site.build(dbName, cookieSecret)
     }))
   } yield (sites)
     

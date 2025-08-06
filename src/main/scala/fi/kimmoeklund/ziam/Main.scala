@@ -24,7 +24,7 @@ object Main extends ZIOAppDefault:
   val routes = ZIO
     .service[List[Site]]
     .map(_.map(_.routes).reduce(_ ++ _))
-  val dataLayers = ZLayer.fromZIO(ZIO.service[Argon2PasswordFactory].map(UserRepositoryLive(_)))
+  val repoLayers = ZLayer.fromZIO(ZIO.service[Argon2PasswordFactory].map(UserRepositoryLive(_)))
     ++ ZLayer.succeed[RoleRepository](RoleRepositoryLive())
     ++ ZLayer.succeed[PermissionRepository](PermissionRepositoryLive())
 
@@ -36,15 +36,15 @@ object Main extends ZIOAppDefault:
     .provide(DbManagementLive.live, dbNameLayer, dsLayer, quills, sites)
     .orDie
     .flatMap(r =>
-        Server
-          .serve(r @@ Middleware.serveResources(Path("assets"), "static"))
-          .provide(
-            Server.default,
-            quills,
-            dataLayers,
-            Argon2.passwordFactory,
-            dsLayer,
-            dbNameLayer,
-            DbManagementLive.live
-          )
+      Server
+        .serve(r @@ Middleware.serveResources(Path("assets"), "static"))
+        .provide(
+          Server.default,
+          quills,
+          repoLayers,
+          Argon2.passwordFactory,
+          dsLayer,
+          dbNameLayer,
+          DbManagementLive.live
+        )
     )
