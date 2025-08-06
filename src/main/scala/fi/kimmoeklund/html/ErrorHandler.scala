@@ -8,10 +8,10 @@ case class DefaultErrorHandler(resource: String):
 
   def handle(error: ErrorCode): ErrorMsg = error match {
     case e: ExistingEntityError => mapFormError(mapExistingEntityError(e, "resource"))
-    case e: InsertDataError => mapFormError(mapInsertDataError(e))
-    case _ => mapFormError(error)
+    case e: InsertDataError     => mapFormError(mapInsertDataError(e))
+    case _                      => mapFormError(error)
   }
-    
+
   def mapExistingEntityError(error: ExistingEntityError, resource: String): FormError = error match {
     case a: ExistingEntityError.EntityNotFound[_] =>
       FormError.ValueInvalid(resource, s"Requested $resource was not found, please reload the page and try again.")
@@ -23,7 +23,9 @@ case class DefaultErrorHandler(resource: String):
     case InsertDataError.UniqueKeyViolation("userName") =>
       FormError.ValueInvalid("username", "Username is already taken, please select another one.")
     case _ =>
-      FormError.ProcessingFailed(s"System failure while creating $resource. ${resource.capitalize} was not created, please try again later.")
+      FormError.ProcessingFailed(
+        s"System failure while creating $resource. ${resource.capitalize} was not created, please try again later."
+      )
   }
 
   def mapFormError(error: ErrorCode) = error match {

@@ -22,7 +22,7 @@ def htmxHead: Html = {
       PartialAttribute(
         "integrityAttr"
       )                                   := "sha384-Akqfrbj/HpNVo8k11SXBb6TlBWmXXlYQrCSqEWmyKJe+hDm3Z/B2WVG4smwBkRVm",
-      PartialAttribute("crossoriginAttr") := "anonymous",
+      PartialAttribute("crossoriginAttr") := "anonymous"
     )
   )
 }
@@ -37,25 +37,25 @@ def htmlSnippet(data: play.twirl.api.Html, status: Status = Status.Ok): Response
 def emptyHtml = Html.fromUnit(())
 
 def selectOption(
-    optsPath: String, 
+    optsPath: String,
     name: String,
     selected: Seq[String] = Seq.empty,
     selectMultiple: Boolean = false
 ) =
-  val baseElements = Chunk[Html](    
+  val baseElements = Chunk[Html](
     idAttr    := name,
     classAttr := "w-full min-w-0",
     nameAttr  := name,
     PartialAttribute("hx-get") := s"$optsPath${QueryParams(Map.from(Seq("selected" -> Chunk.fromIterable(selected)))).encode}",
 //    PartialAttribute("hx-get") := "http://localhost:5080/colors",
     PartialAttribute("hx-trigger") := "load",
-  //  PartialAttribute("hx-params")  := "none",
-   // PartialAttribute("hx-disinherit")  := "*",
-    PartialAttribute("hx-swap")    := "innerHTML",
-    PartialAttribute("hx-target")  := s"#$name",
+    //  PartialAttribute("hx-params")  := "none",
+    // PartialAttribute("hx-disinherit")  := "*",
+    PartialAttribute("hx-swap")   := "innerHTML",
+    PartialAttribute("hx-target") := s"#$name",
     PartialAttribute("hx-select") := "*",
     option(valueAttr := "loading..")
-  ) 
+  )
   val selectElements = if (selectMultiple) baseElements ++ Chunk[Html](multipleAttr := "true") else baseElements
   select(selectElements: _*)
 

@@ -137,11 +137,11 @@ object UserRepositoryLiveSpec extends ZIOSpecDefault:
           quill <- ZIO.serviceAt[QuillCtx]("unittest")
           repo  <- ZIO.service[PermissionRepository]
           permission <- {
-            given QuillCtx = quill.get            
+            given QuillCtx = quill.get
             repo.add(Permission(PermissionId.create, "test permission", 1))
           }
           allPermissions <- {
-            given QuillCtx = quill.get            
+            given QuillCtx = quill.get
             repo.delete(permission.id) *> repo.getList
           }
         } yield assertTrue(!allPermissions.exists(p => p.id == permission.id))

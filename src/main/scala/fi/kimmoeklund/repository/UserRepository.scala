@@ -6,7 +6,7 @@ import io.getquill.*
 import io.getquill.jdbczio.Quill
 import io.github.arainko.ducktape.*
 import zio.*
-import MappedEncodings.given 
+import MappedEncodings.given
 
 import java.sql.SQLException
 import java.util.UUID
@@ -110,27 +110,27 @@ final class UserRepositoryLive(argon2Factory: Argon2PasswordFactory):
   def update(using quill: QuillCtx)(user: User): IO[ExistingEntityError, User] = {
     import quill.*
     val member = user.to[Members]
-    
+
     transaction {
       for {
         // Update member details
         _ <- run(query[Members].filter(m => m.id == lift(member.id)).updateValue(lift(member)))
-        
+
         // Get current role IDs
         currentRoleIds <- run(query[RoleGrants].filter(rg => rg.memberId == lift(user.id)).map(_.roleId))
-        
+
         // Calculate role IDs to add (new roles not in current)
         newRoleIds = user.roles.map(_.id).filterNot(rid => currentRoleIds.contains(RoleId.unwrap(rid)))
         // Calculate role IDs to remove (current roles not in new)
-        roleIdsToRemove = currentRoleIds.filterNot(crid => user.roles.map(_.id).exists(rid => RoleId.unwrap(rid) == crid))
-        
+        roleIdsToRemove = currentRoleIds.filterNot(crid =>
+          user.roles.map(_.id).exists(rid => RoleId.unwrap(rid) == crid)
+        )
+
         // Insert new role grants
         _ <- run(
-          liftQuery(newRoleIds).foreach(roleId =>
-            query[RoleGrants].insertValue(RoleGrants(roleId, lift(user.id)))
-          )
+          liftQuery(newRoleIds).foreach(roleId => query[RoleGrants].insertValue(RoleGrants(roleId, lift(user.id))))
         )
-        
+
         // Delete removed role grants
         _ <- run(
           query[RoleGrants]

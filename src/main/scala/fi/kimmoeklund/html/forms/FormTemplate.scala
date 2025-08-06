@@ -15,7 +15,12 @@ private def inputElement(site: String, annotation: Option[Any], attrs: Seq[Html]
         attrs.appended(typeAttr := "password").appended(valueAttr := value.getOrElse("")): _*
       )
     case (Some(o: inputSelectOptions), v) =>
-      selectOption(s"/$site${o.path}", o.name, v.map(valueString => valueString.split(",").toSeq).getOrElse(Seq.empty), o.selectMultiple)
+      selectOption(
+        s"/$site${o.path}",
+        o.name,
+        v.map(valueString => valueString.split(",").toSeq).getOrElse(Seq.empty),
+        o.selectMultiple
+      )
     case (Some(_: inputHidden), Some(v)) if v != "" =>
       input(attrs.appended(typeAttr := "hidden").appended(valueAttr := value.get): _*)
     case (Some(_: inputHidden), _) =>
@@ -43,7 +48,8 @@ private def withDefaults(site: String, annotation: Option[Any], paramName: Strin
   inputElement(site, annotation, Seq(Tailwind.formInput, nameAttr := paramName), value)
 
 def formTemplate(site: String) = (in: TemplateInput[String]) =>
-    play.twirl.api.Html(div(
+  play.twirl.api.Html(
+    div(
       inputLabel(in.paramName.capitalize, in.annotations.headOption, Tailwind.formLabel),
       div(
         classAttr := "mt-2",
