@@ -6,13 +6,11 @@ import magnolia1.CaseClass
 import magnolia1.SealedTrait
 import scala.deriving.Mirror
 import scala.meta.common.Convert
-import scala.compiletime.erasedValue 
 
 trait FormDecoder[A]:
   def decode(form: Form): Option[A]
 
 object FormDecoder extends Derivation[FormDecoder]:
-  import scala.compiletime.{erasedValue}
   inline def apply[A](using parser: FormDecoder[A]): FormDecoder[A] = parser
 
   def join[A](ctx: CaseClass[FormDecoder, A]): FormDecoder[A] = new FormDecoder[A]:

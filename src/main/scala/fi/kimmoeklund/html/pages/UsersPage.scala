@@ -14,7 +14,6 @@ import zio.{Cause, Chunk, ZIO}
 import java.util.UUID
 import scala.annotation.threadUnsafe
 
-import fi.kimmoeklund.html.encoder.FormDecoder.given
 import play.twirl.api.HtmlFormat
 import zio.http.Path
 
