@@ -38,10 +38,7 @@ trait CrudPage[R, Entity <: CrudResource[Form], View <: Identifiable, Form] exte
     crud_page_new_response(htmlForm(form, Some(errors)), HtmlFormat.empty)
 
   def parseForm(using FormDecoder[Form])(request: Request) = request.body.asURLEncodedForm
-    .flatMap(form => {
-        val f2 = FormDecoder[Form].decode(form)
-        ZIO.fromOption(f2)
-    })
+    .flatMap(form => ZIO.fromOption(FormDecoder[Form].decode(form)))
     .mapError(_ => FormWithErrors[Form](List(FormError.ProcessingFailed("System error, unable to parse form")), None))
     
   def create(using QuillCtx)(request: Request): URIO[R, Html] =
