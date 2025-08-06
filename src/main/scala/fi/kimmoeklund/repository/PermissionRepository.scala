@@ -48,7 +48,7 @@ final class PermissionRepositoryLive extends PermissionRepository:
     val uuids = ids.map(PermissionId.unwrap(_))
     run {
       quote { query[Permissions].filter(p => liftQuery(uuids).contains(p.id)) }
-    }.map(l => l.map(p => p.to[Permission]).toSet) //todo ducktape issue
+    }.map(l => l.map(p => p.to[Permission]).toSet) 
       .filterOrElseWith(permissions => permissions.size == ids.size)(permissions =>
           ZIO.fail(ExistingEntityError.EntityNotFound(ids.diff(permissions.map(_.id).toSet).mkString(",")))
       )
