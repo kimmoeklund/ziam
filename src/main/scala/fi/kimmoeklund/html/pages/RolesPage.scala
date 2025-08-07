@@ -51,8 +51,8 @@ case class RolesPage(path: Path, db: String, val name: String)
     (for {
       roleRepo       <- ZIO.service[RoleRepository]
       permissionRepo <- ZIO.service[PermissionRepository]
-      permissions    <- permissionRepo.getByIds(form.permissions.get) // todo error handling ids are missing
-      r              <- roleRepo.add(Role(RoleId(UUID.randomUUID()), name, permissions))
+      permissions    <- permissionRepo.getByIds(form.permissions.get) 
+      r              <- roleRepo.add(Role(RoleId(UUID.randomUUID()), form.name.getOrElse(""), permissions))
     } yield CreatedEntity(r)).mapError(e => FormWithErrors(List(e), Some(form)))
   )
 
