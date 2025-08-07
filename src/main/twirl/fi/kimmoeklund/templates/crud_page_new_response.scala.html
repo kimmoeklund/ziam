@@ -1,10 +1,14 @@
-@(form: Html, tableRow: Html)
+@(form: Html, tableRow: Html, resourceId: Option[String])
 <!-- crud_page_new_response -->
 <div hx-swap-oob="innerHTML:#form-content">
   @form
 </div>
 <template>
-  <tbody hx-swap-oob="beforeend:#resource-table tbody">
-    <tr>@tableRow</tr>
-  </tbody>
+  @if(resourceId.isDefined) {
+    <tr hx-swap-oob="innerHTML:#resource-@resourceId.get">@tableRow</tr>
+  } else {
+    <tbody hx-swap-oob="beforeend:#resource-table tbody">
+      <tr>@tableRow</tr>
+    </tbody>
+  }
 </template>

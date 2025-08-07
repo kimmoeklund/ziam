@@ -50,7 +50,7 @@ object Site {
             form <- page.getAsForm(None)
           yield(response(site(pages, page.name, crud_page(pageParams(page, db), table, form, true)).body)),        
       Method.POST / page.path.segments.last -> handler: 
-        (request: Request) => page.create(request).map(htmlSnippet(_)),
+        (request: Request) => page.upsert(request).map(htmlSnippet(_)),
       Method.DELETE / page.path.segments.last / string("id") -> handler:
        (id: String, request: Request) => page.delete(id).map(htmlSnippet(_)),
       Method.GET / page.path.segments.last / string("format") -> handler:

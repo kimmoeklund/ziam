@@ -20,6 +20,13 @@ import scala.util.Try
 import fi.kimmoeklund.domain.FormWithErrors
 import fi.kimmoeklund.domain.FormError
 
+sealed trait UpsertResult[T]:
+  val entity: T
+end UpsertResult
+
+case class UpdatedEntity[T](entity: T) extends UpsertResult[T]
+case class CreatedEntity[T](entity: T) extends UpsertResult[T]
+
 trait CrudPage[R, Entity <: CrudResource[Form], View <: Identifiable, Form] extends Page[R]:
 
   private def htmlForm(resource: Option[Form], errors: Option[Seq[ErrorMsg]] = None, idAttr: Option[String] = None) =
@@ -33,21 +40,33 @@ trait CrudPage[R, Entity <: CrudResource[Form], View <: Identifiable, Form] exte
       crud_table_row_buttons(this.path.encode, v.id.toString)
     )
   )
-  private def formAndRow(r: Entity) = crud_page_new_response(htmlForm(Some(r.form), None), this.tableRow(mapToView(r)))
+  private def formAndRow(r: UpsertResult[Entity]) =
+    val view = mapToView(r.entity)
+    crud_page_new_response(
+      htmlForm(Some(r.entity.form), None),
+      this.tableRow(view),
+      r match
+        case e: UpdatedEntity[Entity] => Some(view.id.toString)
+        case e: CreatedEntity[Entity] => None
+    )
+
   private def formWithErrors(form: Option[Form], errors: Seq[ErrorMsg]) =
-    crud_page_new_response(htmlForm(form, Some(errors)), HtmlFormat.empty)
+    crud_page_new_response(htmlForm(form, Some(errors)), HtmlFormat.empty, None)
 
   def parseForm(using FormDecoder[Form])(request: Request) = request.body.asURLEncodedForm
     .flatMap(form => ZIO.fromOption(FormDecoder[Form].decode(form)))
     .mapError(_ => FormWithErrors[Form](List(FormError.ProcessingFailed("System error, unable to parse form")), None))
-    
-  def create(using QuillCtx)(request: Request): URIO[R, Html] =
+
+  def upsert(using QuillCtx)(request: Request): URIO[R, Html] =
     upsertResource(request)
-      .fold(error => formWithErrors(error.form, error.errors.map(errorHandler)), resource => formAndRow(resource))
+      .fold(
+        error => formWithErrors(error.form, error.errors.map(errorHandler)),
+        resource => formAndRow(resource)
+      )
 
   def delete(using QuillCtx)(id: String): URIO[R, Html] =
     deleteInternal(id)
-      .map(_ => HtmlFormat.empty) 
+      .map(_ => HtmlFormat.empty)
       .catchAll(e => ZIO.succeed(Html.apply(s"div(error creating resource: $e")))
 
   def getAsForm(using QuillCtx)(idOpt: Option[String]): URIO[R, Html] = idOpt match {
@@ -64,7 +83,7 @@ trait CrudPage[R, Entity <: CrudResource[Form], View <: Identifiable, Form] exte
       items     <- listItems
       rows      <- ZIO.fromTry(Try(items.map(i => tableRow(mapToView(i)))))
       headers   <- ZIO.fromTry(Try(viewPropertyEncoder.encode(crud_table_header.apply)))
-      tableHtml <- ZIO.fromTry(Try(crud_table(HtmlFormat.fill(headers), rows)))
+      tableHtml <- ZIO.fromTry(Try(crud_table(HtmlFormat.fill(headers), items.map(mapToView(_).id.toString).zip(rows))))
     } yield tableHtml).catchAll(e =>
       ZIO.logError(e.toString) *> ZIO.succeed(Html(s"<div>error fetching data: ${e}</div>"))
     )
@@ -82,6 +101,6 @@ trait CrudPage[R, Entity <: CrudResource[Form], View <: Identifiable, Form] exte
   protected def errorHandler: ErrorCode => ErrorMsg
   protected def mapToView: Entity => View
   protected def listItems(using QuillCtx): ZIO[R, ErrorCode, Seq[Entity]]
-  protected def upsertResource(using QuillCtx)(req: Request): ZIO[R, FormWithErrors[Form], Entity]
+  protected def upsertResource(using QuillCtx)(req: Request): ZIO[R, FormWithErrors[Form], UpsertResult[Entity]]
   protected def deleteInternal(using QuillCtx)(id: String): ZIO[R, ErrorMsg, Unit]
   protected def get(using QuillCtx)(id: String): ZIO[R, ErrorMsg, Entity]

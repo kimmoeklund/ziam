@@ -34,8 +34,8 @@ case class User(id: UserId, name: String, roles: Set[Role], logins: Set[Login])
     Some(this.id),
     Some(this.name),
     this.logins.headOption.map(_.userName),
-    None,
-    None,
+    Some(""),
+    Some(""),
     Some(this.roles.map(_.id))
   )
 

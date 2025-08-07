@@ -53,7 +53,7 @@ case class RolesPage(path: Path, db: String, val name: String)
       permissionRepo <- ZIO.service[PermissionRepository]
       permissions    <- permissionRepo.getByIds(form.permissions.get) // todo error handling ids are missing
       r              <- roleRepo.add(Role(RoleId(UUID.randomUUID()), name, permissions))
-    } yield r).mapError(e => FormWithErrors(List(e), Some(form)))
+    } yield CreatedEntity(r)).mapError(e => FormWithErrors(List(e), Some(form)))
   )
 
   def deleteInternal(using QuillCtx)(id: String) = (for {

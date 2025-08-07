@@ -1,4 +1,4 @@
-@(headers: Html, rows: Seq[Html])
+@(headers: Html, rows: Seq[(String, Html)])
 <!--crud_table.scala.html -->
 <table id="resource-table" class="min-w-full divide-y divide-gray-300">
     <thead>
@@ -8,7 +8,7 @@
     </thead>
     <tbody id="resource-table-body" class="divide-y divide-gray-200">
       @for(row <- rows) {
-        <tr>@row</tr>
+        <tr id="resource-@row._1">@row._2</tr>
       }
     </tbody>
 </table>

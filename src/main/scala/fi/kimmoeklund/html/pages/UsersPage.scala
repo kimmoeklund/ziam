@@ -7,6 +7,7 @@ import fi.kimmoeklund.html.encoder.*
 import fi.kimmoeklund.html.forms.*
 import fi.kimmoeklund.repository.*
 import io.github.arainko.ducktape.*
+import fi.kimmoeklund.html.{UpsertResult, CreatedEntity, UpdatedEntity}
 import zio.http.Request
 import zio.http.template.*
 import zio.{Cause, Chunk, ZIO}
@@ -35,13 +36,15 @@ case class UsersPage(path: Path, db: String, name: String)
 
   def createOrUpdate(using
       QuillCtx
-  )(form: ValidUserForm | ValidNewUserForm, userRepo: UserRepositoryLive, roles: Set[Role]) = form match
+  )(form: ValidUserForm, userRepo: UserRepositoryLive, roles: Set[Role]):ZIO[Any, ErrorCode, UpsertResult[User]] = form match
     case ValidNewUserForm(id, name, roleIds, credentials) =>
       userRepo
         .add(NewPasswordUser(id, name, credentials, roles))
+        .map(CreatedEntity(_))
     case ValidUpdateUserForm(id, name, roleIds, newPassword) =>
       userRepo
         .update(User(id, name, roles, Set.empty))
+        .map(UpdatedEntity(_))
 
   def upsertResource(using QuillCtx)(req: Request) = {
     val parsedForm = parseForm(req)

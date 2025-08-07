@@ -38,7 +38,7 @@ case class PermissionsPage(path: Path, db: String, val name: String)
       (for {
         repo <- ZIO.service[PermissionRepository]
         p    <- repo.add(Permission(PermissionId.create, form.target, form.permission))
-      } yield p).mapError(e => FormWithErrors(List(e), Some(form)))
+      } yield CreatedEntity(p)).mapError(e => FormWithErrors(List(e), Some(form)))
     )
 
   override def deleteInternal(using QuillCtx)(id: String) = (for {
