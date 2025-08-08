@@ -27,6 +27,7 @@ object Main extends ZIOAppDefault:
   val repoLayers = ZLayer.fromZIO(ZIO.service[Argon2PasswordFactory].map(UserRepositoryLive(_)))
     ++ ZLayer.succeed[RoleRepository](RoleRepositoryLive())
     ++ ZLayer.succeed[PermissionRepository](PermissionRepositoryLive())
+    ++ ZLayer.succeed[BlogRepository](BlogRepositoryLive())
 
   def cleanup = {
     ZIO.unit

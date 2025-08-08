@@ -39,3 +39,11 @@ CREATE TABLE IF NOT EXISTS "permission_grants"
     PRIMARY KEY ("role_id", "permission_id")
 );
 
+CREATE TABLE IF NOT EXISTS "blogs"
+(
+    "id"        uuid NOT NULL PRIMARY KEY,
+    "author_id" uuid NOT NULL REFERENCES "members" ("id") ON DELETE CASCADE,
+    "title"     text NOT NULL,
+    "text"      text NOT NULL
+);
+
