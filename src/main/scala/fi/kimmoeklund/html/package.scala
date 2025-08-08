@@ -42,19 +42,11 @@ def selectOption(
     selected: Seq[String] = Seq.empty,
     selectMultiple: Boolean = false
 ) =
-  val baseElements = Chunk[Html](
-    idAttr    := name,
-    classAttr := "w-full min-w-0",
-    nameAttr  := name,
-    PartialAttribute("hx-get") := s"$optsPath${QueryParams(Map.from(Seq("selected" -> Chunk.fromIterable(selected)))).encode}",
-    PartialAttribute("hx-trigger") := "load",
-    PartialAttribute("hx-swap")    := "innerHTML",
-    PartialAttribute("hx-target")  := s"#$name",
-    PartialAttribute("hx-select")  := "*",
-    option(valueAttr := "loading..")
-  )
-  val selectElements = if (selectMultiple) baseElements ++ Chunk[Html](multipleAttr := "true") else baseElements
-  select(selectElements: _*)
+  // using Dom.raw because PartialAttributes are htmlencoded which breaks the url encoding
+  Dom.raw(s"""
+  <select id=${name} name=${name} class="w-full min-w-o" hx-get="$optsPath${QueryParams(Map.from(Seq("selected" -> Chunk.fromIterable(selected)))).encode}" hx-trigger="load" hx-swap="innerHTML" hx-target="#${name}" hx-select="*" ${if selectMultiple then "multiple" else ""}>
+  </select>
+  """)
 
 extension (form: Form)
   def zioFromField(field: String): ZIO[Any, FormError, String] =
