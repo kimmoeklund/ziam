@@ -21,7 +21,7 @@ import fi.kimmoeklund.templates.html.site
 case class Site(
     db: String,
     loginPage: LoginPage[_],
-    routes: Routes[Map[String, QuillCtx] & UserRepositoryLive & PermissionRepository & RoleRepository, Response]
+    routes: Routes[Map[String, QuillCtx] & UserRepositoryLive & PermissionRepository & RoleRepository & BlogRepository, Response]
 )
 
 case class CrudPageParams(pageName: String, description: String, addButtonLabel: String, resourcePath: String)
@@ -74,8 +74,9 @@ object Site {
     val usersPage       = UsersPage(basePath / "users", db, "Users").asInstanceOf[CrudPage[UserRepositoryLive & PermissionRepository, _, _ ,_]]
     val permissionsPage = PermissionsPage(basePath / "permissions", db, "Permissions").asInstanceOf[CrudPage[PermissionRepository, _, _, _]]
     val rolesPage       = RolesPage(basePath / "roles", db, "Roles").asInstanceOf[CrudPage[RoleRepository & PermissionRepository, _, _, _]]
+    val blogsPage       = BlogsPage(basePath / "blogs", db, "Blogs").asInstanceOf[CrudPage[BlogRepository, _, _, _]]
 
-    val pages = Seq(usersPage, rolesPage, permissionsPage)
+    val pages = Seq(usersPage, rolesPage, permissionsPage, blogsPage)
     val pageRoutes = pages.flatMap(buildPageRoutes(pages, _, db))
     val loginPage = DefaultLoginPage("login", "logout", db, cookieSecret);
     // login routes omitted atm, and there's no cookie check
