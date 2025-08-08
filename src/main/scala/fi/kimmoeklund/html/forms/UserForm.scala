@@ -21,7 +21,7 @@ case class UserForm(
     username: Option[String],
     @inputPassword password: Option[String],
     @inputPassword password_confirmation: Option[String],
-    @inputSelectOptions(s"/page/roles/options", "roles", false)
+    @inputSelectOptions(s"/page/roles/options", "roles", true)
     roles: Option[Set[RoleId]]
 ) 
 
