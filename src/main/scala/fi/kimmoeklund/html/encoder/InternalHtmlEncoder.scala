@@ -147,7 +147,15 @@ private[html] object InternalHtmlEncoder extends Derivation[InternalHtmlEncoder]
           paramName,
           annotations
         )
-      else List()
+      else
+        summon[InternalHtmlEncoder[String]].encodeValues(
+          template,
+          "",
+          errors,
+          paramName,
+          annotations
+        )
+
   }
 }
 
