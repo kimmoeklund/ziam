@@ -14,6 +14,7 @@ case class PasswordCredentials(
     userName: String,
     passwordHash: String
 )
+case class Blogs(id: BlogId, authorId: UserId, title: String, text: String)
 
 object MappedEncodings:
   given MappedEncoding[PermissionId, UUID](PermissionId.unwrap)
@@ -22,3 +23,5 @@ object MappedEncodings:
   given MappedEncoding[UUID, RoleId](RoleId.apply)
   given MappedEncoding[UserId, UUID](UserId.unwrap)
   given MappedEncoding[UUID, UserId](UserId.apply)
+  given MappedEncoding[BlogId, UUID](BlogId.unwrap)
+  given MappedEncoding[UUID, BlogId](BlogId.apply)
