@@ -8,3 +8,4 @@ target
 .metals
 node_modules
 **/todo.txt
+.mcp.json
