@@ -44,4 +44,4 @@ assembly / assemblyJarName := "ziam.jar"
 Compile / selectMainClass  := Some("fi.kimmoeklund.ziam.Main")
 reStart / mainClass        := Some("fi.kimmoeklund.ziam.Main")
 
-lazy val root = (project in file(".")).enablePlugins(SbtTwirl)
+lazy val ziam = (project in file(".")).enablePlugins(SbtTwirl)
