@@ -3,6 +3,7 @@ package fi.kimmoeklund.service
 import com.outr.scalapass.Argon2PasswordFactory
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.repository.*
+import fi.kimmoeklund.html.pages.{ValidPermissionForm, ValidRoleForm}
 import zio.*
 import zio.test.*
 import zio.test.TestAspect.*
@@ -64,12 +65,13 @@ object UserRepositoryLiveSpec extends ZIOSpecDefault:
         check(asciiString, Gen.int) { (name, number) =>
           val permission =
             Permission(PermissionId.create, s"permission-$name", number)
+          val validForm = ValidPermissionForm(s"permission-$name", number)
           for {
             quill <- ZIO.serviceAt[QuillCtx]("unittest")
             repo  <- ZIO.service[PermissionRepository]
             result <- {
               given QuillCtx = quill.get
-              repo.add(permission)
+              repo.add(validForm)
             }
             testData <- ZIO.service[ZState[TestScenario]]
             _        <- testData.update(data => data.copy(permissions = data.permissions + permission))
@@ -86,9 +88,10 @@ object UserRepositoryLiveSpec extends ZIOSpecDefault:
             newRole <- ZIO.succeed(
               Role(RoleId(UUID.randomUUID()), s"role-$name", testData.permissions)
             )
+            validForm = ValidRoleForm(s"role-$name", testData.permissions.map(_.id))
             role <- {
               given QuillCtx = quill.get
-              repo.add(newRole)
+              repo.add(validForm)
             }
             _ <- testState.update(data => data.copy(roles = data.roles + newRole))
           } yield assertTrue(role == newRole)
@@ -138,7 +141,7 @@ object UserRepositoryLiveSpec extends ZIOSpecDefault:
           repo  <- ZIO.service[PermissionRepository]
           permission <- {
             given QuillCtx = quill.get
-            repo.add(Permission(PermissionId.create, "test permission", 1))
+            repo.add(ValidPermissionForm("test permission", 1))
           }
           allPermissions <- {
             given QuillCtx = quill.get
@@ -166,7 +169,7 @@ object UserRepositoryLiveSpec extends ZIOSpecDefault:
           testData  <- testState.get
           role <- {
             given QuillCtx = quill.get
-            repo.add(Role(RoleId(UUID.randomUUID()), "test role", testData.permissions))
+            repo.add(ValidRoleForm("test role", testData.permissions.map(_.id)))
           }
           allRoles <- {
             given QuillCtx = quill.get

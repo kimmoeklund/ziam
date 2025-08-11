@@ -1,6 +1,6 @@
 package fi.kimmoeklund.html.pages
 
-import fi.kimmoeklund.domain.FormError.ValueInvalid
+import fi.kimmoeklund.domain.FormError.{ValueInvalid, Missing}
 import fi.kimmoeklund.domain.*
 import fi.kimmoeklund.html.*
 import fi.kimmoeklund.html.encoder.*
@@ -8,7 +8,8 @@ import fi.kimmoeklund.repository.*
 import fi.kimmoeklund.service.DbManagement
 import io.github.arainko.ducktape.*
 import zio.http.Request
-import zio.{Chunk, ZIO}
+import zio.{Chunk, ZIO, Cause}
+import zio.prelude.Validation
 
 import java.util.UUID
 import scala.util.Try
@@ -28,6 +29,15 @@ case class RoleForm(
     @inputSelectOptions("/page/permissions/options", "permissions", true)
     permissions: Option[Set[PermissionId]]
 )
+
+case class ValidRoleForm(name: String, permissions: Set[PermissionId])
+
+object RoleFormValidators:
+  def validateRole(form: RoleForm): Validation[FormError, ValidRoleForm] =
+    Validation.validateWith(
+      Validation.fromOptionWith(Missing("name"))(form.name),
+      Validation.succeed(form.permissions.getOrElse(Set.empty))
+    )(ValidRoleForm.apply)
 
 case class RolesPage(path: Path, db: String, val name: String)
     extends CrudPage[RoleRepository & PermissionRepository, Role, RoleView, RoleForm]:
@@ -49,11 +59,18 @@ case class RolesPage(path: Path, db: String, val name: String)
 
   def upsertResource(using QuillCtx)(request: Request) = parseForm(request).flatMap(form =>
     (for {
-      roleRepo       <- ZIO.service[RoleRepository]
-      permissionRepo <- ZIO.service[PermissionRepository]
-      permissions    <- permissionRepo.getByIds(form.permissions.get) 
-      r              <- roleRepo.add(Role(RoleId(UUID.randomUUID()), form.name.getOrElse(""), permissions))
-    } yield CreatedEntity(r)).mapError(e => FormWithErrors(List(e), Some(form)))
+      roleRepo <- ZIO.service[RoleRepository]
+      _        <- ZIO.log(s"Form: $form")
+      validation = RoleFormValidators.validateRole(form)
+      _         <- ZIO.log(s"Validation result: $validation")
+      validForm <- validation.toZIO.tapError(e => ZIO.log(s"Validation failed with: $e"))
+      _         <- ZIO.log(s"Valid form created: $validForm")
+      r         <- roleRepo.add(validForm)
+    } yield CreatedEntity(r))
+      .tapErrorCause(e => ZIO.log(s"form: ${form.toString} has failures: ${e.failures}"))
+      .mapErrorCause(e => {
+       Cause.fail(FormWithErrors(e.failures, Some(form)))
+    })
   )
 
   def deleteInternal(using QuillCtx)(id: String) = (for {

@@ -7,6 +7,7 @@ import fi.kimmoeklund.html.encoder.*
 import zio.*
 import zio.http.*
 import zio.http.template.*
+import zio.prelude.Validation
 
 import java.util.UUID
 import scala.util.Try
@@ -16,7 +17,16 @@ import fi.kimmoeklund.repository.PermissionRepositoryLive
 import zio.http.template.Attributes.PartialAttribute
 import play.twirl.api.HtmlFormat
 
-case class PermissionForm(target: String, @inputNumber permission: Int)
+case class PermissionForm(target: Option[String], @inputNumber permission: Option[Int])
+
+case class ValidPermissionForm(target: String, permission: Int)
+
+object PermissionFormValidators:
+  def validatePermission(form: PermissionForm): Validation[FormError, ValidPermissionForm] =
+    Validation.validateWith(
+      Validation.fromOptionWith(Missing("target"))(form.target),
+      Validation.fromOptionWith(Missing("permission"))(form.permission)
+    )(ValidPermissionForm.apply)
 
 case class PermissionsPage(path: Path, db: String, val name: String)
     extends CrudPage[PermissionRepository, Permission, Permission, PermissionForm]:
@@ -37,8 +47,9 @@ case class PermissionsPage(path: Path, db: String, val name: String)
     parseForm(request).flatMap(form =>
       (for {
         repo <- ZIO.service[PermissionRepository]
-        p    <- repo.add(Permission(PermissionId.create, form.target, form.permission))
-      } yield CreatedEntity(p)).mapError(e => FormWithErrors(List(e), Some(form)))
+        validForm <- PermissionFormValidators.validatePermission(form).toZIO
+        p    <- repo.add(validForm)
+      } yield CreatedEntity(p)).mapErrorCause(e => Cause.fail(FormWithErrors(e.failures, Some(form))))
     )
 
   override def deleteInternal(using QuillCtx)(id: String) = (for {

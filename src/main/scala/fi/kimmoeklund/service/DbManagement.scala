@@ -12,7 +12,7 @@ enum DbManagementError:
   case DbDoesNotExist
   case IOError(message: String)
 
-type Env = Map[String, QuillCtx] & Repository[_, _]
+type Env = Map[String, QuillCtx] & Repository[_, _, _]
 
 trait DbManagement:
   def provisionDatabase(dbName: String): IO[DbManagementError, Unit]

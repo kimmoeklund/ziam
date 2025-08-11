@@ -12,13 +12,15 @@ import java.sql.SQLException
 import io.github.arainko.ducktape.*
 import zio.*
 import MappedEncodings.given
+import fi.kimmoeklund.html.pages.ValidPermissionForm
 
-type PermissionRepository = Repository[Permission, PermissionId]
+type PermissionRepository = Repository[Permission, PermissionId, ValidPermissionForm]
 
 final class PermissionRepositoryLive extends PermissionRepository:
 
-  override def add(using quill: QuillCtx)(permission: Permission) =
+  override def add(using quill: QuillCtx)(validForm: ValidPermissionForm) =
     import quill.*
+    val permission = Permission(PermissionId.create, validForm.target, validForm.permission)
     (for {
       _ <- run(
         query[Permissions].insertValue(
@@ -63,5 +65,5 @@ final class PermissionRepositoryLive extends PermissionRepository:
       query[Permissions].filter(p => p.id == lift(id)).delete
     }.mapBoth(e => GeneralError.Exception(e.getMessage), _ => ())
 
-  override def update(using quill: QuillCtx)(permission: Permission) = ???
+  override def update(using quill: QuillCtx)(validForm: ValidPermissionForm) = ???
 

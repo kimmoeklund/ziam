@@ -33,7 +33,7 @@ case class Permission(id: PermissionId, target: String, permission: Int)
     with CrudResource[PermissionForm] {
   import scala.math.Ordered.orderingToOrdered
   def compare(that: Permission): Int = this.id compare that.id
-  val form                           = PermissionForm(this.target, this.permission)
+  val form                           = PermissionForm(Some(this.target), Some(this.permission))
 }
 
 object Permission:

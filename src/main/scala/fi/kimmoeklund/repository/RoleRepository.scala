@@ -7,8 +7,9 @@ import zio.*
 import java.util.UUID
 import java.sql.SQLException
 import MappedEncodings.given
+import fi.kimmoeklund.html.pages.ValidRoleForm
 
-type RoleRepository = Repository[Role, RoleId]
+type RoleRepository = Repository[Role, RoleId, ValidRoleForm]
 
 final class RoleRepositoryLive extends RoleRepository:
   private def mapRoles(roles: Seq[(Roles, Option[PermissionGrants], Option[Permissions])]) =
@@ -61,26 +62,28 @@ final class RoleRepositoryLive extends RoleRepository:
         case e: ExistingEntityError => e
       })
 
-  override def add(using quill: QuillCtx)(role: Role): IO[ErrorCode, Role] =
+  override def add(using quill: QuillCtx)(validForm: ValidRoleForm): IO[ErrorCode, Role] =
     import quill.*
-    val newRole = Roles(role.id, role.name)
+    val roleId = RoleId(UUID.randomUUID())
+    val newRole = Roles(roleId, validForm.name)
     transaction {
       for {
-        _ <-
-          run(query[Roles].insertValue(lift(newRole)))
-        _ <-
-          run {
-            liftQuery(role.permissions).foreach(p =>
+        _ <- run(query[Roles].insertValue(lift(newRole)))
+        _ <- run {
+            liftQuery(validForm.permissions).foreach(p =>
               query[PermissionGrants].insertValue(
-                PermissionGrants(lift(newRole.id), p.id)
+                PermissionGrants(lift(newRole.id), p)
               )
             )
           }
-      } yield (newRole)
+        permissions <- run {
+            query[Permissions].filter(p => liftQuery(validForm.permissions.map(PermissionId.unwrap)).contains(p.id))
+          }.map(_.map(p => Permission(p.id, p.target, p.permission)).toSet)
+      } yield Role(roleId, validForm.name, permissions)
     }.mapBoth(
       e => GeneralError.Exception(e.getMessage),
-      r => role
+      role => role
     )
 
-  override def update(using quill: QuillCtx)(role: Role) = ???
+  override def update(using quill: QuillCtx)(validForm: ValidRoleForm) = ???
 
