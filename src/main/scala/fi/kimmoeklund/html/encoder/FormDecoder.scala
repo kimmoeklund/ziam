@@ -28,10 +28,15 @@ object FormDecoder extends Derivation[FormDecoder]:
   inline given [A](using Mirror.Of[A]): FormDecoder[A] = derived[A]
 
   given FormDecoder[String] with
-    def decode(form: Form): Option[String] = form.map.values.headOption.flatMap(_.stringValue)
+    def decode(form: Form): Option[String] = form.map.values.headOption
+      .flatMap(_.stringValue)
+      .flatMap(strValue => Option.when(strValue.nonEmpty)(strValue))
 
   given FormDecoder[Int] with
-    def decode(form: Form): Option[Int] = form.map.values.headOption.flatMap(_.stringValue).flatMap(_.toIntOption)
+    def decode(form: Form): Option[Int] = form.map.values.headOption
+      .flatMap(_.stringValue)
+      .flatMap(strValue => Option.when(strValue.nonEmpty)(strValue))
+      .flatMap(_.toIntOption)
 
   // FormDecoder[Option[A]] givens are for the case that for case classes used for forms contain often only values
   // wrapped in Optional 
