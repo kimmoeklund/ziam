@@ -14,7 +14,7 @@ type QuillCtx = Quill.Sqlite[CompositeNamingStrategy2[SnakeCase, Escape]]
 
 trait Repository[A, Id, InputForm]:
   def delete(using quill: QuillCtx)(id: Id): IO[ErrorCode, Unit]
-  def update(using quill: QuillCtx)(inputForm: InputForm): IO[ErrorCode, Option[A]]
+  def update(using quill: QuillCtx)(id: Id, inputForm: InputForm): IO[ErrorCode, Option[A]]
   def getList(using quill: QuillCtx): IO[ExistingEntityError, Seq[A]]
   def getByIds(using quill: QuillCtx)(ids: Set[Id]): IO[ExistingEntityError, Set[A]]
-  def add(using quill: QuillCtx)(inputForm: InputForm): IO[ErrorCode, A]
+  def add(using quill: QuillCtx)(id: Id, inputForm: InputForm): IO[ErrorCode, A]

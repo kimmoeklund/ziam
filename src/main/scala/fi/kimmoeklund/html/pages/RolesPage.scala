@@ -65,7 +65,7 @@ case class RolesPage(path: Path, db: String, val name: String)
       _         <- ZIO.log(s"Validation result: $validation")
       validForm <- validation.toZIO.tapError(e => ZIO.log(s"Validation failed with: $e"))
       _         <- ZIO.log(s"Valid form created: $validForm")
-      r         <- roleRepo.add(validForm)
+      r         <- roleRepo.add(RoleId.create, validForm)
     } yield CreatedEntity(r))
       .tapErrorCause(e => ZIO.log(s"form: ${form.toString} has failures: ${e.failures}"))
       .mapErrorCause(e => {

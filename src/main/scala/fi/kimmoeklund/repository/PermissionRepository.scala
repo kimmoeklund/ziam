@@ -18,9 +18,9 @@ type PermissionRepository = Repository[Permission, PermissionId, ValidPermission
 
 final class PermissionRepositoryLive extends PermissionRepository:
 
-  override def add(using quill: QuillCtx)(validForm: ValidPermissionForm) =
+  override def add(using quill: QuillCtx)(id: PermissionId, validForm: ValidPermissionForm) =
     import quill.*
-    val permission = Permission(PermissionId.create, validForm.target, validForm.permission)
+    val permission = Permission(id, validForm.target, validForm.permission)
     (for {
       _ <- run(
         query[Permissions].insertValue(
@@ -65,5 +65,5 @@ final class PermissionRepositoryLive extends PermissionRepository:
       query[Permissions].filter(p => p.id == lift(id)).delete
     }.mapBoth(e => GeneralError.Exception(e.getMessage), _ => ())
 
-  override def update(using quill: QuillCtx)(validForm: ValidPermissionForm) = ???
+  override def update(using quill: QuillCtx)(id: PermissionId, validForm: ValidPermissionForm) = ???
 

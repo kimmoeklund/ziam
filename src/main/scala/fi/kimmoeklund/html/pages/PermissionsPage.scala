@@ -48,7 +48,7 @@ case class PermissionsPage(path: Path, db: String, val name: String)
       (for {
         repo <- ZIO.service[PermissionRepository]
         validForm <- PermissionFormValidators.validatePermission(form).toZIO
-        p    <- repo.add(validForm)
+        p    <- repo.add(PermissionId.create, validForm)
       } yield CreatedEntity(p)).mapErrorCause(e => Cause.fail(FormWithErrors(e.failures, Some(form))))
     )
 

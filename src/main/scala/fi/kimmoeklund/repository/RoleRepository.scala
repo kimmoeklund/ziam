@@ -62,10 +62,9 @@ final class RoleRepositoryLive extends RoleRepository:
         case e: ExistingEntityError => e
       })
 
-  override def add(using quill: QuillCtx)(validForm: ValidRoleForm): IO[ErrorCode, Role] =
+  override def add(using quill: QuillCtx)(id: RoleId, validForm: ValidRoleForm): IO[ErrorCode, Role] =
     import quill.*
-    val roleId = RoleId(UUID.randomUUID())
-    val newRole = Roles(roleId, validForm.name)
+    val newRole = Roles(id, validForm.name)
     transaction {
       for {
         _ <- run(query[Roles].insertValue(lift(newRole)))
@@ -79,11 +78,11 @@ final class RoleRepositoryLive extends RoleRepository:
         permissions <- run {
             query[Permissions].filter(p => liftQuery(validForm.permissions.map(PermissionId.unwrap)).contains(p.id))
           }.map(_.map(p => Permission(p.id, p.target, p.permission)).toSet)
-      } yield Role(roleId, validForm.name, permissions)
+      } yield Role(id, validForm.name, permissions)
     }.mapBoth(
       e => GeneralError.Exception(e.getMessage),
       role => role
     )
 
-  override def update(using quill: QuillCtx)(validForm: ValidRoleForm) = ???
+  override def update(using quill: QuillCtx)(id: RoleId, validForm: ValidRoleForm) = ???
 

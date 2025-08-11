@@ -22,6 +22,7 @@ object RoleId extends Newtype[UUID]:
   given Convert[String, Option[RoleId]] with
     def apply(roleId: String): Option[RoleId] =
       Try(java.util.UUID.fromString(roleId)).toOption.map(RoleId(_))
+  def create: RoleId = RoleId(java.util.UUID.randomUUID())
 
 type RoleId = RoleId.Type
 
