@@ -42,12 +42,15 @@ object Cli extends ZIOCliDefault {
     val effect = for {
       quill <- ZIO.service[Map[String, QuillCtx]]
       repo  <- ZIO.service[UserRepositoryLive]
-      user <- ZIO.fromOption(
-        quill
-          .get(database)
-          .map(quillCtx => {
-            given QuillCtx = quillCtx
-            repo.add(
+      userResult <- ZIO
+        .fromOption(
+          quill.get(database)
+        )
+        .mapError(_ => new RuntimeException(s"Database '$database' not found in quill contexts"))
+        .flatMap { quillCtx =>
+          given QuillCtx = quillCtx
+          repo
+            .add(
               NewPasswordUser(
                 UserId(UUID.randomUUID()),
                 "database admin",
@@ -55,9 +58,13 @@ object Cli extends ZIOCliDefault {
                 Set()
               )
             )
-          })
-      )
-    } yield ()
+            .tapBoth(
+              e => ZIO.logError(s"Adding user failed: ${e}"),
+              u => ZIO.logInfo(s"Adding user succeeded: ${u}")
+            )
+        }
+    } yield userResult
+
     effect.provide(quillLayer, repoLayer, dsLayer, dbNameLayer, Argon2.passwordFactory, DbManagementLive.live)
   }
 }
