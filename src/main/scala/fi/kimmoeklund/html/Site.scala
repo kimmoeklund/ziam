@@ -12,6 +12,7 @@ import zio.http.*
 import zio.http.Method.*
 import zio.http.Path.*
 import zio.http.codec.PathCodec.literal
+import zio.http.codec.PathCodec
 import zio.http.template.{Dom, Html, div, idAttr}
 
 import scala.reflect.TypeTest
@@ -22,11 +23,37 @@ case class Site(
     db: String,
     loginPage: LoginPage[_],
     routes: Routes[Map[String, QuillCtx] & UserRepositoryLive & PermissionRepository & RoleRepository, Response]
-)
+):
+  def checkCookie: Middleware[Any] =
+  new Middleware[Any] {
+    override def apply[Env1 <: Any, Err](routes: Routes[Env1, Err]): Routes[Env1, Err] =
+      routes.transform { handler =>
+          Handler.fromFunctionZIO { request =>
+            println("foo")
+            ZIO.log(s"request.path.segments: ${request.path.segments}") *>
+              request.path.segments.toList.match {
+                case db :: site :: "page" :: tail =>
+                  println("foo2")
+                  val decrypted = for 
+                    cookie <- request.cookie(site)
+                    decrypted <- cookie.toRequest.unSign(loginPage.cookieSecret.toString)
+                  yield (decrypted)
+                  if (decrypted.isDefined) then handler(request) else ZIO.succeed(Response.redirect(URL((Path.root ++ loginPage.loginPath))))
+                case _ => 
+                  println("foo3")
+                  handler(request) //TODO allow only login and others ZIO.succeed(Response.status(Status.NotFound))
+              }
+        }
+      }
+  }
+  def routesWithCookieCheck = this.routes @@ checkCookie
+end Site  
 
 case class CrudPageParams(pageName: String, description: String, addButtonLabel: String, resourcePath: String)
 
 object Site {
+
+
   def response(content: String) =
       Response(
         Status.Ok,
@@ -37,23 +64,23 @@ object Site {
 
   private def buildPageRoutes[R](using QuillCtx)(pages: Seq[CrudPage[_, _, _, _]], page: CrudPage[R, _, _, _], db: String) =
     Chunk(
-      Method.GET / page.path.segments.last -> handler:
+      Method.GET / literal("page") / page.path.segments.last -> handler:
         (request: Request) =>
           val id = request.url.queryParam("id")
           for
             table <-page.renderAsTable             
             form <- page.getAsForm(id)
           yield(response(site(pages, page.name, crud_page(pageParams(page, db), table, form, id.isDefined)).body)),        
-      Method.GET / page.path.segments.last / "new" -> handler:
+      Method.GET / literal("page") / page.path.segments.last / "new" -> handler:
           for
             table <-page.renderAsTable             
             form <- page.getAsForm(None)
           yield(response(site(pages, page.name, crud_page(pageParams(page, db), table, form, true)).body)),        
-      Method.POST / page.path.segments.last -> handler: 
+      Method.POST / literal("page") / page.path.segments.last -> handler: 
         (request: Request) => page.upsert(request).map(htmlSnippet(_)),
-      Method.DELETE / page.path.segments.last / string("id") -> handler:
+      Method.DELETE / literal("page") / page.path.segments.last / string("id") -> handler:
        (id: String, request: Request) => page.delete(id).map(htmlSnippet(_)),
-      Method.GET / page.path.segments.last / string("format") -> handler:
+      Method.GET / literal("page") / page.path.segments.last / string("format") -> handler:
         (format: String, request: Request) => format match 
           case "options" =>
             page.renderAsOptions(request.url.queryParams("selected")).mapBoth((e: ErrorMsg) => Response.internalServerError(e.msg), htmlSnippet(_))
@@ -77,29 +104,32 @@ object Site {
 
     val pages = Seq(usersPage, rolesPage, permissionsPage)
     val pageRoutes = pages.flatMap(buildPageRoutes(pages, _, db))
-    val loginPage = DefaultLoginPage("login", "logout", db, cookieSecret);
+    val loginPage = DefaultLoginPage(Path("site") / db / "login", Path("site") / db / "logout", db, cookieSecret);
     // login routes omitted atm, and there's no cookie check
     val loginRoutes =
       Chunk(
-        Method.POST / db / loginPage.loginPath -> handler { (request: Request) =>
+        Method.POST / loginPage.loginPath.segments.last -> handler { (request: Request) =>
+          println("post poling")
           loginPage
             .doLogin(request)
+            .tapError(e => ZIO.log(s"login failed: ${e}"))
             .mapBoth(
-              _ => Response.html(loginPage.showLogin),
-              _ => Response.seeOther(URL(Path("db")./:("users.html#resource-users"))).addCookie(loginPage.loginCookie)
+              _ => response(loginPage.showLogin),
+              _ => Response.seeOther(URL(Path.root ++ usersPage.path)).addCookie(loginPage.loginCookie)
             )
         },
-        Method.GET / db / loginPage.loginPath -> handler {
-          Response.html(loginPage.showLogin)
+        Method.GET / loginPage.loginPath.segments.last -> handler {
+          println("show login")
+          response(loginPage.showLogin)
         },
-        Method.GET / db / loginPage.logoutPath -> handler {
-          Response.seeOther(URL(usersPage.path)).addCookie(loginPage.logoutCookie)
+        Method.GET / loginPage.logoutPath.segments.last -> handler {
+          Response.seeOther(URL(Path.root ++ loginPage.loginPath)).addCookie(loginPage.logoutCookie)
         }
       )
     Site(
       db,
       loginPage,
-      literal("site") / db / "page" / Routes.fromIterable(pageRoutes) 
+      literal("site") / db / Routes.fromIterable(pageRoutes ++ loginRoutes) 
     )
   }
 }
