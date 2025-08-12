@@ -1,14 +1,14 @@
 @(headers: Html, rows: Seq[(String, Html)])
 <!--crud_table.scala.html -->
-<table id="resource-table" class="min-w-full divide-y divide-gray-300">
-    <thead>
+<table id="resource-table" class="min-w-full divide-y divide-gray-200">
+    <thead class="bg-gray-50">
         <tr>
           @headers
         </tr>
     </thead>
-    <tbody id="resource-table-body" class="divide-y divide-gray-200">
+    <tbody id="resource-table-body" class="divide-y divide-gray-200 bg-white">
       @for(row <- rows) {
-        <tr id="resource-@row._1">@row._2</tr>
+        <tr id="resource-@row._1" class="hover:bg-gray-50 transition-colors duration-150">@row._2</tr>
       }
     </tbody>
 </table>

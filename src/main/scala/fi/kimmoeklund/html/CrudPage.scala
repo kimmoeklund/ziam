@@ -19,6 +19,7 @@ import zio.{Cause, Chunk, IO, URIO, ZIO}
 import scala.util.Try
 import fi.kimmoeklund.domain.FormWithErrors
 import fi.kimmoeklund.domain.FormError
+import fi.kimmoeklund.templates.html.crud_table_actions_header
 
 sealed trait UpsertResult[T]:
   val entity: T
@@ -80,10 +81,17 @@ trait CrudPage[R, Entity <: CrudResource[Form], View <: Identifiable, Form] exte
 
   def renderAsTable(using QuillCtx): URIO[R, Html] =
     (for {
-      items     <- listItems
-      rows      <- ZIO.fromTry(Try(items.map(i => tableRow(mapToView(i)))))
-      headers   <- ZIO.fromTry(Try(viewPropertyEncoder.encode(crud_table_header.apply)))
-      tableHtml <- ZIO.fromTry(Try(crud_table(HtmlFormat.fill(headers), items.map(mapToView(_).id.toString).zip(rows))))
+      items   <- listItems
+      rows    <- ZIO.fromTry(Try(items.map(i => tableRow(mapToView(i)))))
+      headers <- ZIO.fromTry(Try(viewPropertyEncoder.encode(crud_table_header.apply)))
+      tableHtml <- ZIO.fromTry(
+        Try(
+          crud_table(
+            HtmlFormat.fill(headers.appended(HtmlFormat.raw(crud_table_actions_header().body))),
+            items.map(mapToView(_).id.toString).zip(rows)
+          )
+        )
+      )
     } yield tableHtml).catchAll(e =>
       ZIO.logError(e.toString) *> ZIO.succeed(Html(s"<div>error fetching data: ${e}</div>"))
     )
