@@ -9,24 +9,6 @@ import zio.{Chunk, ZIO}
 
 import scala.util.Try
 
-def htmxHead: Html = {
-  head(
-    Html.fromString("""<meta name="htmx-config" content='{"useTemplateFragments":true}'>"""),
-    title("Permissions"),
-    link(
-      relAttr  := "stylesheet",
-      hrefAttr := "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-    ),
-    script(
-      srcAttr := "https://unpkg.com/htmx.org@2.0.6",
-      PartialAttribute(
-        "integrityAttr"
-      )                                   := "sha384-Akqfrbj/HpNVo8k11SXBb6TlBWmXXlYQrCSqEWmyKJe+hDm3Z/B2WVG4smwBkRVm",
-      PartialAttribute("crossoriginAttr") := "anonymous"
-    )
-  )
-}
-
 def htmlSnippet(data: play.twirl.api.Html, status: Status = Status.Ok): Response =
   Response(
     status,

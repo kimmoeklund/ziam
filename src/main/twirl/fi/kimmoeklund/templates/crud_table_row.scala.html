@@ -1,4 +1,6 @@
 @import fi.kimmoeklund.html.encoder.TemplateInput
 @(input: TemplateInput[_])
 <!-- crud_table_row.scala.html -->
-<td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">@Html(input.value.getOrElse("").toString)</td>
+<td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+  @Html(input.value.getOrElse("").toString)
+</td>
