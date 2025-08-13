@@ -11,6 +11,7 @@ import zio.prelude.Newtype
 import java.time.Duration
 import scala.util.Try
 import fi.kimmoeklund.templates.html.login_page
+import fi.kimmoeklund.domain.Identifiable
 
 object CookieSecret extends Newtype[String]
 type CookieSecret = CookieSecret.Type
@@ -19,19 +20,17 @@ trait LoginPage[A]:
   val loginPath: Path 
   val logoutPath: Path 
   val cookieSecret: CookieSecret
-  val loginCookie: Cookie.Response
-  val logoutCookie: Cookie.Response
+  def loginCookie(user: A): Cookie.Response
+  def logoutCookie: Cookie.Response
   def doLogin(using quill: QuillCtx)(request: Request): ZIO[UserRepositoryLive, ErrorCode, A]
   def showLogin: String
 end LoginPage
 
-final case class DefaultLoginPage private (
+case class DefaultLoginPage(
     loginPath: Path,
     logoutPath: Path,
     db: String,
     cookieSecret: CookieSecret,
-    loginCookie: Cookie.Response,
-    logoutCookie: Cookie.Response
 ) extends LoginPage[User] {
 
   override def showLogin: String = login_page().body
@@ -43,13 +42,9 @@ final case class DefaultLoginPage private (
       password <- form.zioFromField("password")
       user     <- repo.checkUserPassword(userName, password)
     } yield (user)
+  override def loginCookie(user: User) =
+    Cookie.Response(db, user.id.toString, None, Some(Path(db)), false, true).sign(CookieSecret.unwrap(cookieSecret))
+  override def logoutCookie = Cookie
+    .Response(db, "", None, Some(Path(db)), false, true, Some(Duration.ZERO))
+    .sign(CookieSecret.unwrap(cookieSecret))
 }
-
-object DefaultLoginPage:
-  def apply(loginPath: Path, logoutPath: Path, db: String, cookieSecret: CookieSecret) =
-    val loginCookie =
-      Cookie.Response(db, "", None, Some(Path(db)), false, true).sign(CookieSecret.unwrap(cookieSecret))
-    val logoutCookie = Cookie
-      .Response(db, "", None, Some(Path(db)), false, true, Some(Duration.ZERO))
-      .sign(CookieSecret.unwrap(cookieSecret))
-    new DefaultLoginPage(loginPath, logoutPath, db, cookieSecret, loginCookie, logoutCookie)
