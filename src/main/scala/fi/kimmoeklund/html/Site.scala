@@ -18,6 +18,8 @@ import zio.http.template.{Dom, Html, div, idAttr}
 import scala.reflect.TypeTest
 import fi.kimmoeklund.templates.html.crud_page
 import fi.kimmoeklund.templates.html.site
+import scala.util.Try
+import java.util.UUID
 
 case class Site(
     db: String,
@@ -25,19 +27,32 @@ case class Site(
     routes: Routes[Map[String, QuillCtx] & UserRepositoryLive & PermissionRepository & RoleRepository, Response]
 ):
   // middleware that checks cookie for all site paths except login page, and returns 404 if cookie not valid
-  def checkCookie: Middleware[Any] =
-  new Middleware[Any] {
-    override def apply[Env1 <: Any, Err](routes: Routes[Env1, Err]): Routes[Env1, Err] =
+  def checkCookie: Middleware[Map[String, QuillCtx] & UserRepositoryLive] =
+  new Middleware {
+    override def apply[Env1 <: Map[String, QuillCtx] & UserRepositoryLive, Err](routes: Routes[Env1, Err]): Routes[Env1, Err] =
       routes.transform { handler =>
           Handler.fromFunctionZIO { request =>
               val loginPath = loginPage.loginPath.segments.last
               request.path.segments.toList.match {
                 case db :: site :: "page" :: tail =>
-                  val decrypted = for 
-                    cookie <- request.cookie(site)
-                    decrypted <- cookie.toRequest.unSign(loginPage.cookieSecret.toString)
-                  yield (decrypted)
-                  if (decrypted.isDefined) then handler(request) else ZIO.succeed(Response.redirect(URL((Path.root ++ loginPage.loginPath))))
+                  val user = for { 
+                    cookie <- ZIO.fromOption(request.cookie(site))
+                    decrypted <- ZIO.fromOption(cookie.toRequest.unSign(loginPage.cookieSecret.toString))
+                    _ <- ZIO.log(s"userid from cookie: ${decrypted.content}")
+                    quills <- ZIO.service[Map[String, QuillCtx]]
+                    quill <- ZIO.fromOption(quills.get(site))
+                    repo <- ZIO.service[UserRepositoryLive]
+                    users <- {
+                      given QuillCtx = quill
+                      val userId =Try(UUID.fromString(decrypted.content)).toOption.map(UserId(_))                      
+                      ZIO.log(s"userId: ${userId}") *> repo.getList(userId)
+                    }
+                    _ <- ZIO.log(s"user found: ${users}")
+                  } yield (users.headOption)
+                  user.foldZIO(
+                  e => ZIO.log(s"failed fetching user: ${e}") *> ZIO.succeed(Response.redirect(URL((Path.root ++ loginPage.loginPath)))),
+                  userOpt => if (userOpt.isDefined) handler(request) else ZIO.succeed(Response.redirect(URL((Path.root ++ loginPage.loginPath))))
+                )
                 case db :: site :: loginPath :: tail => handler(request)
                 case _ => ZIO.succeed(Response.status(Status.NotFound))
               }
