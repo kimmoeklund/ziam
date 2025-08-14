@@ -18,34 +18,17 @@ import zio.http.template.{Dom, Html, div, idAttr}
 import scala.reflect.TypeTest
 import fi.kimmoeklund.templates.html.crud_page
 import fi.kimmoeklund.templates.html.site
+import scala.util.Try
+import java.util.UUID
+
+case class RequestContext(requestId: String, user: User) 
 
 case class Site(
     db: String,
     loginPage: LoginPage[_],
-    routes: Routes[Map[String, QuillCtx] & UserRepositoryLive & PermissionRepository & RoleRepository, Response]
-):
-  // middleware that checks cookie for all site paths except login page, and returns 404 if cookie not valid
-  def checkCookie: Middleware[Any] =
-  new Middleware[Any] {
-    override def apply[Env1 <: Any, Err](routes: Routes[Env1, Err]): Routes[Env1, Err] =
-      routes.transform { handler =>
-          Handler.fromFunctionZIO { request =>
-              val loginPath = loginPage.loginPath.segments.last
-              request.path.segments.toList.match {
-                case db :: site :: "page" :: tail =>
-                  val decrypted = for 
-                    cookie <- request.cookie(site)
-                    decrypted <- cookie.toRequest.unSign(loginPage.cookieSecret.toString)
-                  yield (decrypted)
-                  if (decrypted.isDefined) then handler(request) else ZIO.succeed(Response.redirect(URL((Path.root ++ loginPage.loginPath))))
-                case db :: site :: loginPath :: tail => handler(request)
-                case _ => ZIO.succeed(Response.status(Status.NotFound))
-              }
-        }
-      }
-  }
-  def routesWithCookieCheck = this.routes @@ checkCookie
-end Site  
+    loginRoutes: Routes[Map[String, QuillCtx] & UserRepositoryLive, Response],
+    pageRoutes: Routes[Map[String, QuillCtx] & UserRepositoryLive & PermissionRepository & RoleRepository, Response]
+)
 
 case class CrudPageParams(pageName: String, description: String, addButtonLabel: String, resourcePath: String)
 
@@ -64,17 +47,21 @@ object Site {
     val pagePathCodec = PathCodec.literal(page.path.encode)
     Chunk(
       Method.GET / pagePathCodec -> handler:
-        (request: Request) =>
+        (request: Request) => 
           val id = request.url.queryParam("id")
-          for
-            table <-page.renderAsTable             
-            form <- page.getAsForm(id)          
-          yield(response(site(pages, page.name, crud_page(pageParams(page, db), table, form, id.isDefined)).body)),        
+          withContext((requestCtx: RequestContext) =>
+            for
+              table <-page.renderAsTable             
+              form <- page.getAsForm(id)
+            yield(response(site(pages, page.name, requestCtx.user, crud_page(pageParams(page, db), table, form, id.isDefined)).body))
+          ),        
       Method.GET / pagePathCodec / "new" -> handler:
-          for
-            table <-page.renderAsTable             
-            form <- page.getAsForm(None)
-          yield(response(site(pages, page.name, crud_page(pageParams(page, db), table, form, true)).body)),        
+          withContext((requestCtx: RequestContext) =>
+            for
+              table <-page.renderAsTable             
+              form <- page.getAsForm(None)
+            yield(response(site(pages, page.name, requestCtx.user, crud_page(pageParams(page, db), table, form, true)).body))
+          ),        
       Method.POST / pagePathCodec -> handler: 
         (request: Request) => page.upsert(request).map(htmlSnippet(_)),
       Method.DELETE / pagePathCodec / string("id") -> handler:
@@ -128,7 +115,8 @@ object Site {
     Site(
       db,
       loginPage,
-      Routes.fromIterable(pageRoutes ++ loginRoutes) 
+      Routes.fromIterable(loginRoutes),
+      Routes.fromIterable(pageRoutes) @@ CookieAspectHandler.checkCookie(loginPage.loginPath, loginPage.cookieSecret),
     )
   }
 }

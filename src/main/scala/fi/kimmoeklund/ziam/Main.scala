@@ -23,7 +23,8 @@ object Main extends ZIOAppDefault:
   val sites       = ZLayer.fromZIO(Site.layer)
   val routes = ZIO
     .service[List[Site]]
-    .map(_.map(_.routesWithCookieCheck).reduce(_ ++ _))
+    .map(_.map(site => site.pageRoutes ++ site.loginRoutes)
+    .reduce(_ ++ _))
   val repoLayers = ZLayer.fromZIO(ZIO.service[Argon2PasswordFactory].map(UserRepositoryLive(_)))
     ++ ZLayer.succeed[RoleRepository](RoleRepositoryLive())
     ++ ZLayer.succeed[PermissionRepository](PermissionRepositoryLive())
