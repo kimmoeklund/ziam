@@ -1,5 +1,6 @@
 @import fi.kimmoeklund.html.Page
-@(pages: Seq[Page[_]], activePage: String, crudPageContent: Html)
+@import fi.kimmoeklund.domain.User
+@(pages: Seq[Page[_]], activePage: String, user: User, crudPageContent: Html)
 @cls(page: String) = {
   @if(page == activePage) {
     "bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 border-l-4 border-indigo-600 font-semibold"
@@ -139,8 +140,7 @@
                   </svg>
                 </div>
                 <div class="flex-1">
-                  <p class="text-sm font-medium text-gray-900">Admin User</p>
-                  <p class="text-xs text-gray-500">admin@@example.com</p>
+                  <p class="text-sm font-medium text-gray-900">@user.name</p>
                 </div>
               </div>
               <a href="../logout" class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors duration-200">
