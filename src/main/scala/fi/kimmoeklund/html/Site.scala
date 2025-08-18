@@ -18,6 +18,7 @@ import zio.http.template.{Dom, Html, div, idAttr}
 import scala.reflect.TypeTest
 import fi.kimmoeklund.templates.html.crud_page
 import fi.kimmoeklund.templates.html.site
+import fi.kimmoeklund.templates.html.chat
 import scala.util.Try
 import java.util.UUID
 
@@ -25,7 +26,7 @@ case class RequestContext(requestId: String, user: User)
 
 case class Site(
     db: String,
-    loginPage: LoginPage[_],
+    loginPage: LoginPage[?],
     loginRoutes: Routes[Map[String, QuillCtx] & UserRepositoryLive, Response],
     pageRoutes: Routes[Map[String, QuillCtx] & UserRepositoryLive & PermissionRepository & RoleRepository, Response]
 )
@@ -43,7 +44,7 @@ object Site {
       )
   def pageParams[R](page: Page[R], db: String) = CrudPageParams(page.name, s"List of ${page.name}", s"Add ${page.name}", page.path.encode)
 
-  private def buildPageRoutes[R](using QuillCtx)(pages: Seq[CrudPage[_, _, _, _]], page: CrudPage[R, _, _, _], db: String) =
+  private def buildPageRoutes[R](using QuillCtx)(pages: Seq[CrudPage[?, ?, ?, ?]], page: CrudPage[R, ?, ?, ?], db: String) =
     val pagePathCodec = PathCodec.literal(page.path.encode)
     Chunk(
       Method.GET / pagePathCodec -> handler:
@@ -85,15 +86,28 @@ object Site {
   def build(using QuillCtx)(db: String, cookieSecret: CookieSecret) = {
     val basePath = Path("site") / db 
     val pageBasePath = basePath / "page" 
-    val usersPage       = UsersPage(pageBasePath / "users", db, "Users").asInstanceOf[CrudPage[UserRepositoryLive & PermissionRepository, _, _ ,_]]
-    val permissionsPage = PermissionsPage(pageBasePath / "permissions", db, "Permissions").asInstanceOf[CrudPage[PermissionRepository, _, _, _]]
-    val rolesPage       = RolesPage(pageBasePath / "roles", db, "Roles").asInstanceOf[CrudPage[RoleRepository & PermissionRepository, _, _, _]]
+    val usersPage       = UsersPage(pageBasePath / "users", db, "Users").asInstanceOf[CrudPage[UserRepositoryLive & PermissionRepository, ?, ? ,?]]
+    val permissionsPage = PermissionsPage(pageBasePath / "permissions", db, "Permissions").asInstanceOf[CrudPage[PermissionRepository, ?, ?, ?]]
+    val rolesPage       = RolesPage(pageBasePath / "roles", db, "Roles").asInstanceOf[CrudPage[RoleRepository & PermissionRepository, ?, ?, ?]]
+    val chatPage        = ChatPage(pageBasePath / "chat", "Chat")
 
     val pages = Seq(usersPage, rolesPage, permissionsPage)
     val pageRoutes = pages.flatMap(buildPageRoutes(pages, _, db))
     val loginPage = DefaultLoginPage(basePath / "login", basePath / "logout", db, cookieSecret);
     val loginPathCodec = PathCodec.literal(loginPage.loginPath.encode)
     val logoutPathCodec = PathCodec.literal(loginPage.logoutPath.encode)
+    val webSocketApp = Handler.webSocket { channel => 
+      channel.receiveAll {
+        case ChannelEvent.Read(WebSocketFrame.Text(_)) => 
+          channel.send(ChannelEvent.Read(WebSocketFrame.text("bar")))
+        case _ => 
+          ZIO.unit
+      }
+    }
+    val websocketRoute = Chunk(Method.GET / literal("site") / db / literal("chat") / literal("websocket") -> handler(webSocketApp.toResponse))
+    val chatRoute = Chunk(Method.GET / literal("site") / db / literal("chat") -> handler:
+        response(site(pages, "Chat", User(UserId.create, "dummy user", Set(), Set()), chat()).body))
+
     val loginRoutes = 
       Chunk(
         Method.POST / loginPathCodec -> handler { (request: Request) =>
@@ -115,7 +129,7 @@ object Site {
     Site(
       db,
       loginPage,
-      Routes.fromIterable(loginRoutes),
+      Routes.fromIterable(loginRoutes ++ websocketRoute ++ chatRoute),
       Routes.fromIterable(pageRoutes) @@ CookieAspectHandler.checkCookie(loginPage.loginPath, loginPage.cookieSecret),
     )
   }
