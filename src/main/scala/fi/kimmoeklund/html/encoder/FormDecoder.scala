@@ -16,7 +16,7 @@ object FormDecoder extends Derivation[FormDecoder]:
   def join[A](ctx: CaseClass[FormDecoder, A]): FormDecoder[A] = new FormDecoder[A]:
     override def decode(form: Form): Option[A] =
       val paramValues = ctx.params.map { param =>
-        val filteredForm = Form(form.get(param.label).toList: _*)
+        val filteredForm = Form(form.get(param.label).toList*)
         param.typeclass.decode(filteredForm)
       }
       Some(ctx.construct(param => paramValues(param.index).getOrElse(None)))

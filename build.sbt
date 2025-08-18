@@ -4,7 +4,7 @@ val quillVersion          = "4.8.6"
 val testContainersVersion = "0.40.11"
 val zioVersion            = "2.1.14"
 val zioMockVersion        = "1.0.0-RC12"
-ThisBuild / scalaVersion := "3.3.4"
+ThisBuild / scalaVersion := "3.7.2"
 ThisBuild / organization := "fi.kimmoeklund"
 
 ThisBuild / assemblyMergeStrategy := {
@@ -32,6 +32,7 @@ libraryDependencies ++= Seq(
   "io.github.arainko" %% "ducktape"          % "0.1.8",
   "dev.zio"           %% "zio-prelude"       % "1.0.0-RC19",
   "dev.zio"           %% "zio-cli"           % "0.5.0",
+  "org.llm4s"         %% "llm4s"             % "0.1.9",
   "dev.zio"           %% "zio-test"          % zioVersion     % Test,
   "dev.zio"           %% "zio-test-sbt"      % zioVersion     % Test,
   "dev.zio"           %% "zio-test-junit"    % zioVersion     % Test,

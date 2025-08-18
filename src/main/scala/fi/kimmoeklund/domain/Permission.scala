@@ -23,7 +23,7 @@ object PermissionId extends Newtype[UUID]:
   def create: PermissionId              = PermissionId(java.util.UUID.randomUUID())
   extension (permissionId: PermissionId)
     def compare(that: PermissionId) =
-      PermissionId.unwrap(permissionId).toString() compare PermissionId.unwrap(that).toString
+      PermissionId.unwrap(permissionId).toString().compare(PermissionId.unwrap(that).toString)
 
 type PermissionId = PermissionId.Type
 
@@ -32,7 +32,7 @@ case class Permission(id: PermissionId, target: String, permission: Int)
     with Ordered[Permission]
     with CrudResource[PermissionForm] {
   import scala.math.Ordered.orderingToOrdered
-  def compare(that: Permission): Int = this.id compare that.id
+  def compare(that: Permission): Int = this.id.compare(that.id)
   val form                           = PermissionForm(Some(this.target), Some(this.permission))
 }
 

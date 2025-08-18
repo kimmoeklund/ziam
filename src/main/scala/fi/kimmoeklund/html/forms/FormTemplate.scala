@@ -8,11 +8,11 @@ private def inputElement(site: String, annotation: Option[Any], attrs: Seq[Html]
   (annotation, value) match {
     case (Some(_: inputEmail), _) =>
       input(
-        attrs.appended(typeAttr := "email").appended(valueAttr := value.getOrElse("")): _*
+        attrs.appended(typeAttr := "email").appended(valueAttr := value.getOrElse(""))*
       )
     case (Some(_: inputPassword), _) =>
       input(
-        attrs.appended(typeAttr := "password").appended(valueAttr := value.getOrElse("")): _*
+        attrs.appended(typeAttr := "password").appended(valueAttr := value.getOrElse(""))*
       )
     case (Some(o: inputSelectOptions), v) =>
       selectOption(
@@ -22,12 +22,12 @@ private def inputElement(site: String, annotation: Option[Any], attrs: Seq[Html]
         o.selectMultiple
       )
     case (Some(_: inputHidden), Some(v)) if v != "" =>
-      input(attrs.appended(typeAttr := "hidden").appended(valueAttr := value.get): _*)
+      input(attrs.appended(typeAttr := "hidden").appended(valueAttr := value.get)*)
     case (Some(_: inputHidden), _) =>
       Dom.empty
     case (_, _) =>
       input(
-        attrs.appended(typeAttr := "text").appended(valueAttr := value.getOrElse("")): _*
+        attrs.appended(typeAttr := "text").appended(valueAttr := value.getOrElse(""))*
       )
   }
 
